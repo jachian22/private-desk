@@ -1,0 +1,49 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+*.so
+
+# Tests / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.tox/
+
+# Secrets and local config (never commit)
+.env
+.env.*
+config.toml
+*.pem
+
+# Private kind packs (Chase etc. live here if someone copies them into the repo)
+kinds/private/
+kinds/*.local.yaml
+
+# Local job / model / Holo dumps if someone runs from the repo
+jobs/
+inbox/
+holo-runs/
+*.gguf
+*.gguf.split*
+hai-agent-runtime
+
+# Logs
+*.log
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~

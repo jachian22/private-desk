@@ -1,0 +1,23 @@
+id: demo_dummy_files
+title: Write dummy statement files
+description: Write three empty PDFs into the artifact dir. No browser. No Holo.
+risk: read_only
+inference: local
+may_need_you: false
+runner: dummy
+requires_artifacts: true
+max_steps: 1
+max_time_s: 30
+url_allowlist: []
+denied_actions:
+  - transfer
+  - pay
+  - send_money
+params:
+  type: object
+  additionalProperties: false
+  properties: {}
+artifacts:
+  dir_template: "{artifact_root}/{date}/{kind}"
+prompt: |
+  No Holo. The dummy runner writes empty PDFs and exits.

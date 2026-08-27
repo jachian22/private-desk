@@ -258,6 +258,8 @@ v1 has no `queued` (reject when busy). Transitions: `running → {needs_you ⇄ 
 
 ### `summary` / `artifacts` (only when `state=succeeded`)
 
+v1 sets `artifacts` and leaves `summary` null. Do not clone the artifact list into `summary`.
+
 ```json
 {
   "artifact_count": 3,
@@ -336,7 +338,9 @@ Error:
 }
 ```
 
-`doctor` must not print secrets. Report hosted vs local, whether llama.cpp is reachable, Holo binary, macOS permissions. `webhook: not used in v1`.
+`doctor` must not print secrets. Report hosted vs local, whether llama.cpp is reachable, Holo binary. Missing Holo is a **warning** (dummy kinds still work); exit 0. `private-desk doctor --strict` exits 5 if Holo/permissions are not ready. Do not grep `holo doctor` English for permissions. `webhook: not used in v1`.
+
+`private-desk logs` dumps worker.log only when stdout is a TTY. JSON never includes log text. Remote assistants must not call `logs`.
 
 ---
 
@@ -344,18 +348,16 @@ Error:
 
 1. Create `~/.local/share/private-desk/jobs/<job_id>/`
 2. Write `job.json` (public Job). Keep it the only API source of truth. Heartbeat `updated_at`.
-3. Take desktop lock (file + pid). If held by a live worker → `desktop_busy`
+3. Take desktop lock with `fcntl.flock` **before** writing `job.json`. If the lock is held → `desktop_busy` (no ghost job). The worker inherits the lock fd; the lock dies with the worker. No pid/mtime grace.
 4. Materialize `artifact_dir` empty
-5. If kind needs Holo: `holo run` with interpolated prompt, `max_steps`, `max_time_s`, `--quiet`. Do not pass flags that stream frames to stdout. Hosted: no `--base-url`. Local: `--base-url` from config (default `http://127.0.0.1:8080/v1`) and `--model` from config
-6. Do not parse Holo stdout into the Job beyond coarse state. Redact anything that might leak
-7. **Pause:** 2FA / permission dialog / login wall / “confirm it’s you”. Set `needs_you`, write `job.json`. Holo pauses if the runtime supports it; otherwise stop clicking and wait. **No `submit_otp` API.** Resume when the human continues **on the laptop** (`private-desk resume <id>` and/or Holo’s own resume)
+5. If kind needs Holo: Python `holo_desktop.agent_client` (pause / resume / cancel). Do not treat `holo run` + wait-for-exit as the engine. Hosted: default runtime. Local: `SpawnConfig(base_url, model)`.
+6. Stream events to laptop-only logs. Write a **redacted** copy. Never put Holo events in the Job. Detect `NEEDS_YOU: mfa_required|needs_login|os_permission` (or a pause event type), `pause()` the session, set `needs_you`.
+7. **Pause:** 2FA / permission dialog / login wall. **No `submit_otp` API.** Resume when the human continues **on the laptop** (`private-desk resume <id>` then `client.resume`). Fake runner env is **tests only**.
 8. On success, confirm expected artifacts exist before `succeeded`. If Holo claims done and the dir is empty (for kinds that require files), `failed` / `internal`
 9. Kill Holo on `cancel`, `timeout`, `unexpected_nav`, `denied_actions`
 10. Release lock; worker exits
 
-HoloDesktop (as of 2026): `holo run "<prompt>"`, optional `--base-url`, `--model`, `--max-steps`, `--max-time-s`, `--quiet`. First run downloads closed-source `hai-agent-runtime`. macOS: Screen Recording + Accessibility. Linux: X11, not Wayland. Factor `doctor` around `holo doctor` if present.
-
-If Holo’s Python `agent_client` pause/resume is cleaner than wrapping `holo run`, use that internally. The assistant still never sees it.
+HoloDesktop (as of 2026): embed with `holo_desktop.agent_client` (`pause` / `resume` / `cancel`). CLI `holo run` is not the worker engine. First run downloads closed-source `hai-agent-runtime`. macOS: Screen Recording + Accessibility. Linux: X11, not Wayland. `doctor` runs `holo doctor` when present but does not grep its English output.
 
 Do not implement a “give the assistant a live view” debug flag. Local only: `private-desk logs <id>` to the tty of the person at the laptop.
 
@@ -401,7 +403,7 @@ v1 does **not** auto-start llama.cpp. `doctor` checks the URL if local kinds exi
 - Integration: fake runner (no Holo) `running → succeeded` with dummy files
 - Integration: fake runner pauses at login → `needs_you` → `resume` → `succeeded`
 - Integration: cancel during running (worker + child die; lock released)
-- Manual: `private-desk doctor` without Accessibility → `os_permission`
+- Manual: `private-desk doctor --strict` on a machine without Accessibility; expect non-zero only in strict mode
 - Manual: `demo_dummy_files` then `demo_open_repo` via CLI
 - Manual: Grok Bot local command kick of dummy files (no bank)
 

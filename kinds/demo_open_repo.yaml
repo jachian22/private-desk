@@ -1,0 +1,38 @@
+id: demo_open_repo
+title: Open the private-desk GitHub repo
+description: Open the public repo in the browser and stop. Hosted Holo; screenshots go to H Company.
+risk: read_only
+inference: hosted
+may_need_you: false
+runner: holo
+requires_artifacts: false
+max_steps: 20
+max_time_s: 180
+url_allowlist:
+  - https://github.com/
+denied_actions:
+  - transfer
+  - pay
+  - send_money
+  - star
+params:
+  type: object
+  additionalProperties: false
+  properties: {}
+artifacts:
+  dir_template: "{artifact_root}/{date}/{kind}"
+prompt: |
+  You are demonstrating computer-use only.
+  Open the default browser.
+  Go to {repo_url}
+  Stop when the repository page is visible.
+  Do not log in. Do not star. Do not type passwords.
+  Do not open settings, billing, or private pages.
+  If you hit a login wall, 2FA, captcha, or OS permission dialog, do not type secrets.
+  Reply with exactly one of:
+  NEEDS_YOU: needs_login
+  NEEDS_YOU: mfa_required
+  NEEDS_YOU: os_permission
+  Then wait.
+  When the public repo page is on screen, exit.
+

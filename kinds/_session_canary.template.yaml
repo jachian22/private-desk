@@ -1,0 +1,44 @@
+# Copy to ~/.config/private-desk/kinds/ and fill in YOUR site.
+# Do not commit a live bank kind to this repo.
+#
+# id: session_canary_example
+# title: Session canary
+# description: Open a site you already use. Pause if login is required. Confirm you are in. Stop.
+id: session_canary_template
+title: Session canary (template — do not run)
+description: Shape only. Copy to private kinds, set url, inference local, may_need_you true.
+risk: read_only
+inference: local
+may_need_you: true
+runner: holo
+requires_artifacts: false
+max_steps: 25
+max_time_s: 300
+url_allowlist:
+  - https://example.com/
+denied_actions:
+  - transfer
+  - pay
+  - send_money
+  - wire
+  - zelle
+  - submit_payment
+params:
+  type: object
+  additionalProperties: false
+  properties: {}
+artifacts:
+  dir_template: "{artifact_root}/{date}/{kind}"
+prompt: |
+  Open Chrome using the dedicated private-desk browser profile from config (browser_profile).
+  Do not use a different profile.
+  Go to the site named in this private kind's url_allowlist.
+  If you see a login wall, 2FA, captcha, or "confirm it's you", do not type passwords, OTPs, or recovery codes.
+  Reply with exactly one of:
+  NEEDS_YOU: needs_login
+  NEEDS_YOU: mfa_required
+  NEEDS_YOU: os_permission
+  Then wait.
+  If already logged in, confirm the signed-in home/account chrome is visible, then exit.
+  Do not download statements. Do not open transfers, pay, or settings.
+
