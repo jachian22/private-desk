@@ -21,10 +21,10 @@ from private_desk.needs_you import (
     event_caller_id,
     fail_message,
     flatten_text,
-    instruction_for,
     is_session_end,
     is_session_paused,
     text_for_needs_you,
+    user_action_for,
 )
 from private_desk.redact import event_to_dict, redact, redact_text
 from private_desk.runners import RunnerError, artifact_dir_for, artifacts_payload, wait_for_resume
@@ -40,8 +40,8 @@ def holo_importable() -> bool:
 
 POLL_WAIT_S = 10
 CONTINUE_PREFIX = (
-    "The human finished the laptop action. The browser is already on screen. "
-    "Do not type passwords or codes. Do not hunt for the app.\n"
+    "The human finished the laptop action. The URL was just opened again. "
+    "Look at that window. Do not type passwords or codes. Do not hunt for the app.\n"
 )
 
 
@@ -71,15 +71,16 @@ async def _pause_for_human(
     kind: Kind,
     code: str,
     cancelled,
+    *,
+    browser: str = "",
+    launch_url: str = "",
+    isolated: bool = False,
 ) -> bool:
     """Pause Holo and wait for laptop resume. False if the session already ended (answer 409)."""
     jobs.set_state(
         job,
         "needs_you",
-        user_action={
-            "code": code,
-            "instruction": instruction_for(code),
-        },
+        user_action=user_action_for(code),
         step={
             "id": "waiting_for_human",
             "label": "Waiting on the laptop",
@@ -101,6 +102,8 @@ async def _pause_for_human(
             await client.cancel(session_id)
         raise RunnerError("cancelled", "Job cancelled.")
     jobs.set_state(job, "running", user_action=None, step=job.get("step"))
+    if launch_url:
+        await asyncio.to_thread(open_https, browser, launch_url, isolated=isolated)
     if alive:
         await _resume_session(client, session_id)
     return alive
@@ -216,7 +219,15 @@ async def _run_session(
                 """Wait for the laptop. Restart Holo if NEEDS_YOU ended the session."""
                 nonlocal session_id, from_index
                 alive = await _pause_for_human(
-                    client, session_id, job, kind, code, cancelled
+                    client,
+                    session_id,
+                    job,
+                    kind,
+                    code,
+                    cancelled,
+                    browser=extra["browser"],
+                    launch_url=launch_url,
+                    isolated=kind.launch_isolated,
                 )
                 if alive:
                     return

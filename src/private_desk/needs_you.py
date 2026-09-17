@@ -110,6 +110,16 @@ def instruction_for(code: str) -> str:
     return INSTRUCTIONS.get(code, INSTRUCTIONS["mfa_required"])
 
 
+def user_action_for(code: str) -> dict[str, str]:
+    """Human instruction plus machine next-step. Assistants copy instruction, then resume."""
+    token = code if code in INSTRUCTIONS else "mfa_required"
+    return {
+        "code": token,
+        "instruction": instruction_for(token),
+        "next": "resume",
+    }
+
+
 def event_agent_kind(raw: dict[str, Any] | None) -> str:
     if not raw:
         return ""

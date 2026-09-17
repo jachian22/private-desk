@@ -99,10 +99,10 @@ v2 (parked): HTTP MCP, Tailscale/relay, inbound webhooks. Do not bind `0.0.0.0` 
 **Skill / routine shape**
 
 - Call `private-desk kinds` rather than guessing params
-- Call `private-desk start …` with an idempotency key (`kind` + params + local date)
+- Call `private-desk start …` with an idempotency key (`kind` + params + local date + a unique suffix). Same key within 24h returns the existing Job with `replayed: true` — tell them it already ran. A new ask (“do it again”) needs a new key.
 - Tell the user the job id and that the laptop may be taken over
 - Never pass secrets. Never read artifact files. Never start another job unless they ask
-- On `needs_you`, copy `user_action.instruction` verbatim and stop. Do not ask them to paste codes into chat
+- On `needs_you`, copy `user_action.instruction` verbatim and stop. Do not ask them to paste codes into chat. When they confirm they finished on the laptop, `private-desk resume <id>` then `get`. Do not `start` again. `user_action.next` is `resume`.
 - On success, report `kind` and `artifacts.artifact_dir` and stop
 - On `desktop_busy`, say a job is running; they can wait or `private-desk cancel <id>` then start
 
@@ -252,11 +252,12 @@ v1 has no `queued` (reject when busy). Transitions: `running → {needs_you ⇄ 
 ```json
 {
   "code": "mfa_required",
-  "instruction": "Enter the code on your laptop. Do not send the code in chat."
+  "instruction": "Enter the code on your laptop. Do not send the code in chat.",
+  "next": "resume"
 }
 ```
 
-`instruction` is for the human. The assistant copies it verbatim and stops.
+`instruction` is for the human. The assistant copies it verbatim and stops. v1 then **waits for them to confirm** they finished on the laptop (no clickable modal yet). Then `private-desk resume <id>`. Do not start a new job. `next` is machine-readable (`resume`).
 
 ### `summary` / `artifacts` (only when `state=succeeded`)
 
@@ -316,20 +317,20 @@ private-desk get <job_id>
 private-desk wait <job_id>       # laptop tty: poll until not running, then print get
 private-desk status              # running + needs_you
 private-desk cancel <job_id>
-private-desk resume <job_id>     # human finished laptop action
+private-desk resume <job_id>     # human finished laptop action; waits until not needs_you
 private-desk doctor              # runtime, permissions, inference, webhook N/A in v1
 ```
 
-`start` returns immediately with the Job (`running`). Do not block until Holo exits. Dummy-files may be so fast the first `get` is already `succeeded`. Optional `--wait` (and `private-desk wait <id>`) is laptop-tty only: the worker still forks; this process polls until the Job leaves `running` (`needs_you`, `succeeded`, `failed`, `cancelled`) and prints `get`.
+`start` returns immediately with the Job (`running`). Do not block until Holo exits. Dummy-files may be so fast the first `get` is already `succeeded`. Optional `--wait` (and `private-desk wait <id>`) is laptop-tty only: the worker still forks; this process polls until the Job leaves `running` (`needs_you`, `succeeded`, `failed`, `cancelled`) and prints `get`. `resume` writes the continue signal and waits until the Job leaves `needs_you` (`running` or terminal). It does not wait for Holo to finish.
 
-Idempotency: if `idempotency_key` matches an in-flight or recently finished job (last 24h), return that Job; do not start a second Holo.
+Idempotency: if `idempotency_key` matches an in-flight or recently finished job (last 24h), return that Job with `replayed: true`; do not start a second Holo. A fresh start sets `replayed: false`. New human intent needs a new key.
 
 Exit codes: `0` ok, `2` validation / `kind_denied`, `3` not found, `4` `desktop_busy`, `5` `runtime_unavailable` / `os_permission`, `1` everything else. Still print the JSON error body.
 
 Successful start:
 
 ```json
-{ "ok": true, "job": { "job_id": "job_01JEXAMPLE", "state": "running" } }
+{ "ok": true, "replayed": false, "job": { "job_id": "job_01JEXAMPLE", "state": "running" } }
 ```
 
 Error:
@@ -358,7 +359,7 @@ Error:
 4. Materialize `artifact_dir` empty
 5. If kind needs Holo: Python `holo_desktop.agent_client` (pause / resume / cancel). Do not treat `holo run` + wait-for-exit as the engine. Hosted: default runtime. Local: `SpawnConfig(base_url, model)`.
 6. Stream events to laptop-only logs. Write a **redacted** copy. Never put Holo events in the Job. Detect `NEEDS_YOU: mfa_required|needs_login|os_permission` (or a pause event type), `pause()` the session, set `needs_you`.
-7. **Pause:** 2FA / permission dialog / login wall. **No `submit_otp` API.** Resume when the human continues **on the laptop** (`private-desk resume <id>` then `client.resume`). Fake runner env is **tests only**.
+7. **Pause:** 2FA / permission dialog / login wall. **No `submit_otp` API.** Resume when the human continues **on the laptop** (`private-desk resume <id>`). If the kind has `launch_url`, open that URL again, then `client.resume` (or a new session if Holo already `answer`ed). Fake runner env is **tests only**.
 8. On success, confirm expected artifacts exist before `succeeded`. If Holo claims done and the dir is empty (for kinds that require files), `failed` / `internal`
 9. Kill Holo on `cancel`, `timeout`, `unexpected_nav`, `denied_actions`
 10. Release lock; worker exits

@@ -100,7 +100,7 @@ def start_job(kind_id: str, params: dict[str, Any] | None, idempotency_key: str 
     if idempotency_key:
         existing = jobs.find_idempotent(idempotency_key)
         if existing:
-            return _ok(job=jobs.public_job(existing))
+            return _ok(job=jobs.public_job(existing), replayed=True)
 
     if kind.runner == "holo" and not holo_ready(cfg.holo_bin):
         return _err("runtime_unavailable", "holo / holo_desktop is not installed.", 5)
@@ -149,7 +149,7 @@ def start_job(kind_id: str, params: dict[str, Any] | None, idempotency_key: str 
         jobs.pid_path(job["job_id"]).write_text(str(proc.pid))
         held.write_meta(job["job_id"], proc.pid)
         held.detach_parent()
-        return _ok(job=jobs.public_job(job))
+        return _ok(job=jobs.public_job(job), replayed=False)
     except Exception:
         if job is not None:
             jobs.set_state(
@@ -204,14 +204,22 @@ def cancel_job(job_id: str) -> Result:
     return _ok(job=jobs.public_job(job))
 
 
-def resume_job(job_id: str) -> Result:
+def resume_job(job_id: str, *, poll_s: float = 0.2, timeout_s: float = 30.0) -> Result:
     job = jobs.load_job(job_id)
     if not job:
         return _err("not_found", f"Job '{job_id}' not found.", 3)
     if job.get("state") != "needs_you":
         return _ok(job=jobs.public_job(job))
     jobs.resume_path(job_id).write_text("resume\n")
-    return _ok(job=jobs.public_job(job))
+    deadline = time.time() + timeout_s
+    while time.time() < deadline:
+        result = get_job(job_id)
+        if not result.ok:
+            return result
+        if result.payload["job"].get("state") != "needs_you":
+            return result
+        time.sleep(poll_s)
+    return get_job(job_id)
 
 
 def job_logs(job_id: str) -> Result:

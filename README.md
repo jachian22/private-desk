@@ -65,7 +65,7 @@ Grok Bot cron must **ask** before starting any `may_need_you` job. It must not r
 ```bash
 private-desk setup --browser "Google Chrome"
 private-desk kinds
-private-desk start demo_dummy_files --idempotency-key dummy-2026-08-27
+private-desk start demo_dummy_files --idempotency-key dummy-2026-08-27-a
 private-desk get <job_id>
 private-desk status
 private-desk cancel <job_id>
