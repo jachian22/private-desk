@@ -46,10 +46,12 @@ def test_wait_job_returns_when_not_running(isolated):
 def test_idempotency_returns_same_job_id(isolated):
     a = start_job("demo_dummy_files", {}, "same-key")
     assert a.ok
+    assert a.payload["replayed"] is False
     job_id = a.payload["job"]["job_id"]
     _wait(job_id, "succeeded")
     b = start_job("demo_dummy_files", {}, "same-key")
     assert b.ok
+    assert b.payload["replayed"] is True
     assert b.payload["job"]["job_id"] == job_id
 
 
@@ -80,11 +82,13 @@ def test_needs_you_then_resume(isolated, monkeypatch):
     job_id = started.payload["job"]["job_id"]
     job = _wait(job_id, "needs_you")
     assert job["user_action"]["code"] == "needs_login"
+    assert job["user_action"]["next"] == "resume"
     assert "Do not send" in job["user_action"]["instruction"]
     active = status_jobs().payload["jobs"]
     assert any(j["job_id"] == job_id for j in active)
-    resumed = resume_job(job_id)
+    resumed = resume_job(job_id, poll_s=0.05)
     assert resumed.ok
+    assert resumed.payload["job"]["state"] != "needs_you"
     done = _wait(job_id, "succeeded", timeout=8.0)
     assert done["artifacts"]["artifact_count"] >= 3
 

@@ -10,6 +10,7 @@ from private_desk.needs_you import (
     is_session_end,
     is_session_paused,
     text_for_needs_you,
+    user_action_for,
 )
 
 
@@ -169,3 +170,11 @@ def test_session_paused_is_not_idle():
     assert is_session_end("idle") is True
     assert is_session_end("completed") is True
     assert is_session_end("paused") is False
+
+
+def test_user_action_for_sets_resume_next():
+    action = user_action_for("needs_login")
+    assert action["code"] == "needs_login"
+    assert action["next"] == "resume"
+    assert "Do not send" in action["instruction"]
+    assert user_action_for("unknown")["code"] == "mfa_required"

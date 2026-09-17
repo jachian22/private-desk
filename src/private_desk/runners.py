@@ -10,6 +10,7 @@ from typing import Any
 from private_desk import jobs, paths
 from private_desk.config import Config, artifact_root_path
 from private_desk.kinds import Kind
+from private_desk.needs_you import user_action_for
 
 
 class RunnerError(Exception):
@@ -96,10 +97,7 @@ def run_dummy(
         jobs.set_state(
             job,
             "needs_you",
-            user_action={
-                "code": "needs_login",
-                "instruction": "Sign in on your laptop. Do not send the password or code in chat.",
-            },
+            user_action=user_action_for("needs_login"),
             step={"id": "waiting_for_login", "label": "Waiting for login", "n": 1, "of": 2},
         )
         wait_for_resume(job, kind.max_time_s)

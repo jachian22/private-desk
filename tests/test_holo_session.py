@@ -56,6 +56,7 @@ def test_answer_409_still_sets_needs_you_and_skips_resume(isolated):
             loaded = jobs.load_job(job["job_id"])
             seen["state"] = loaded["state"]
             seen["code"] = (loaded.get("user_action") or {}).get("code")
+            seen["next"] = (loaded.get("user_action") or {}).get("next")
             raise _Conflict()
 
     client = Client()
@@ -65,6 +66,7 @@ def test_answer_409_still_sets_needs_you_and_skips_resume(isolated):
     assert alive is False
     assert seen["state"] == "needs_you"
     assert seen["code"] == "needs_login"
+    assert seen["next"] == "resume"
     assert client.resumed is False
     loaded = jobs.load_job(job["job_id"])
     assert loaded["state"] == "running"
@@ -89,3 +91,38 @@ def test_pause_success_resumes_session(isolated):
     assert client.resumed is True
     loaded = jobs.load_job(job["job_id"])
     assert loaded["state"] == "running"
+
+
+def test_pause_reopens_launch_url_after_resume(isolated, monkeypatch):
+    kind = load_kinds()["demo_star_repo"]
+    job = jobs.new_job(
+        kind=kind.id,
+        risk=kind.risk,
+        inference="hosted",
+        idempotency_key="star-reopen",
+    )
+    jobs.resume_path(job["job_id"]).write_text("resume\n")
+    opened: list[tuple[str, str, bool]] = []
+
+    def fake_open(app: str, url: str, *, isolated: bool = False, settle_s: float = 0) -> None:
+        opened.append((app, url, isolated))
+
+    monkeypatch.setattr("private_desk.holo_session.open_https", fake_open)
+    client = _Client()
+    asyncio.run(
+        _pause_for_human(
+            client,
+            "sess",
+            job,
+            kind,
+            "needs_login",
+            _not_cancelled,
+            browser="Google Chrome",
+            launch_url="https://github.com/jachian22/private-desk",
+            isolated=False,
+        )
+    )
+    assert opened == [
+        ("Google Chrome", "https://github.com/jachian22/private-desk", False)
+    ]
+    assert client.resumed is True

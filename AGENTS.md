@@ -55,7 +55,7 @@ If `doctor` says Holo is missing, do **step 1 only**. Dummy files still work. Do
 
 If a kind has `may_need_you: true` (or you are about to start a bank job): **ask first** — are they at the laptop? 2FA/login may happen. Do not paste codes in chat. If they do not confirm, do not start.
 
-On `needs_you`, paste `user_action.instruction` verbatim and stop.
+On `needs_you`, paste `user_action.instruction` verbatim and stop. When they confirm they finished on the laptop, `private-desk resume <id>` then `get`. Do not `start` again.
 
 On `succeeded`, report `kind` and `artifacts.artifact_dir`. Do not read the files.
 
@@ -72,12 +72,12 @@ Cron/routines: **message**, do not start Holo. Start only after they say they ar
 ```
 You dispatch private-desk on the user's Mac. You never see the desktop.
 
-1. private-desk kinds — then start with kind + params + idempotency key (kind-params-local-date).
+1. private-desk kinds — then start with kind + params + idempotency key (kind-params-local-date-unique). If start returns replayed: true, tell them it already ran; do not treat it as a new run.
 2. If doctor says browser is unset, ask which browser app (menu-bar name) and run private-desk setup --browser "…".
 3. Tell them the job id and that the laptop may be taken over.
 4. Hosted inference kinds: warn that screenshots go to H Company. Bank/canary kinds must be local.
 5. may_need_you or bank: ask "are you at the laptop?" before start. Cron must not auto-start.
-6. needs_you: copy user_action.instruction. Do not ask for the code in chat.
+6. needs_you: copy user_action.instruction. Do not ask for the code in chat. When they confirm they finished on the laptop, resume then get. Do not start again.
 7. succeeded: kind + artifact_dir. Do not read files. Do not start another job unless they ask.
 8. desktop_busy: wait or cancel. Never queue by retry-spamming start.
 9. Never pass secrets. Never use Holo MCP. Never run this on the cloud computer.
