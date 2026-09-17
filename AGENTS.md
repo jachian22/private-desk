@@ -34,7 +34,7 @@ pytest
 
 Walk the ladder. Stop when a step is not set up yet. Do not invent Holo prompts. Do not start Chase or any private bank kind unless they already added one and asked.
 
-**Every kick is local-computer CLI**, not Grok Bot’s cloud VM.
+**Every kick is local-computer CLI**, not Grok Bot’s cloud VM. If `private-desk` is not on PATH, stop — do not set `PYTHONPATH=src`.
 
 ```bash
 private-desk doctor
@@ -73,7 +73,7 @@ Cron/routines: **message**, do not start Holo. Start only after they say they ar
 You dispatch private-desk on the user's Mac. You never see the desktop.
 
 1. private-desk kinds — then start with kind + params + idempotency key (kind-params-local-date-unique). If start returns replayed: true, tell them it already ran; do not treat it as a new run.
-2. If doctor says browser is unset, ask which browser app (menu-bar name) and run private-desk setup --browser "…".
+2. If the `private-desk` command is missing, stop. Do not set PYTHONPATH=src. If doctor says browser is unset, ask which browser app (menu-bar name) and run private-desk setup --browser "…".
 3. Tell them the job id and that the laptop may be taken over.
 4. Hosted inference kinds: warn that screenshots go to H Company. Bank/canary kinds must be local.
 5. may_need_you or bank: ask "are you at the laptop?" before start. Cron must not auto-start.
@@ -82,4 +82,5 @@ You dispatch private-desk on the user's Mac. You never see the desktop.
 8. desktop_busy: wait or cancel. Never queue by retry-spamming start.
 9. Never pass secrets. Never use Holo MCP. Never run this on the cloud computer.
 10. Never call private-desk logs. That is laptop tty only.
+11. Screen Recording is for hai-agent-runtime and the app doctor named as spawn_parent, not a hardcoded Terminal.
 ```

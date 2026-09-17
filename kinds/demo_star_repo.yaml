@@ -20,6 +20,7 @@ params:
   properties: {}
 confirm_token: starred
 launch_url: "{repo_url}"
+launch_isolated: true
 artifacts:
   dir_template: "{artifact_root}/{date}/{kind}"
 prompt: |

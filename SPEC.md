@@ -343,7 +343,7 @@ Error:
 }
 ```
 
-`doctor` must not print secrets. Report hosted vs local, whether llama.cpp is reachable, Holo binary, and whether `browser` is set. Missing Holo is a **warning** (dummy kinds still work); exit 0. `private-desk doctor --strict` exits 5 if Holo/permissions are not ready. Do not grep `holo doctor` English for permissions. `webhook: not used in v1`.
+`doctor` must not print secrets. Report hosted vs local, whether llama.cpp is reachable, Holo binary, whether `browser` is set, whether `private-desk` is on PATH, and the **detected spawn parent** for Screen Recording (`hai-agent-runtime` plus Terminal/Cursor/iTerm/…). Missing Holo is a **warning** (dummy kinds still work); exit 0. `private-desk doctor --strict` exits 5 if Holo/permissions are not ready. Do not grep `holo doctor` English for permissions. `webhook: not used in v1`.
 
 `private-desk setup` writes gitignored `config.toml`. Agents ask the human which browser app to use, then pass `--browser` (non-interactive). TTY with no flags walks the same three fields.
 
@@ -359,7 +359,7 @@ Error:
 4. Materialize `artifact_dir` empty
 5. If kind needs Holo: Python `holo_desktop.agent_client` (pause / resume / cancel). Do not treat `holo run` + wait-for-exit as the engine. Hosted: default runtime. Local: `SpawnConfig(base_url, model)`.
 6. Stream events to laptop-only logs. Write a **redacted** copy. Never put Holo events in the Job. Detect `NEEDS_YOU: mfa_required|needs_login|os_permission` (or a pause event type), `pause()` the session, set `needs_you`.
-7. **Pause:** 2FA / permission dialog / login wall. **No `submit_otp` API.** Resume when the human continues **on the laptop** (`private-desk resume <id>`). If the kind has `launch_url`, open that URL again, then `client.resume` (or a new session if Holo already `answer`ed). Fake runner env is **tests only**.
+7. **Pause:** 2FA / permission dialog / login wall. **No `submit_otp` API.** Resume when the human continues **on the laptop** (`private-desk resume <id>`). If the kind has `launch_url`, **reuse** the job browser window (do not open a second one), then `client.resume` (or a new session if Holo already `answer`ed). When the Job is terminal, close **only** that job browser (isolated profile), never the daily browser. Fake runner env is **tests only**.
 8. On success, confirm expected artifacts exist before `succeeded`. If Holo claims done and the dir is empty (for kinds that require files), `failed` / `internal`
 9. Kill Holo on `cancel`, `timeout`, `unexpected_nav`, `denied_actions`
 10. Release lock; worker exits
