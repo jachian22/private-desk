@@ -185,20 +185,22 @@ params:
   type: object
   additionalProperties: false
   properties: {}
+launch_url: "{repo_url}"   # optional; macOS `open` this http(s) URL in {browser} before Holo
 artifacts:
   dir_template: "{artifact_root}/{date}/{kind}"
 prompt: |
-  Open the default browser.
-  Go to the project's public GitHub URL from config/repo_url.
-  Stop when the repo page is visible.
+  {browser} is being opened to {repo_url}.
+  Confirm the repo page is visible. Do not hunt via Spotlight or Terminal.
   Do not log in. Do not star. Do not type passwords.
 ```
 
 Bank / session-canary kinds: `inference: local`, `may_need_you: true`. v0 runners refuse `mutating` unless local config `allow_mutating = true`. Grok Bot still asks the user first. `demo_star_repo` is mutating.
 
-The runner interpolates **only** validated params plus `artifact_dir`, `date`, `repo_url`. Missing required param → `kind_denied` before Holo.
+The runner interpolates **only** validated params plus `artifact_dir`, `date`, `repo_url`, `browser`, `browser_profile`. Optional `launch_url` uses the same mapping; v0 opens it with macOS `open` / AppleScript before Holo. `launch_isolated: true` (public open-repo demo) starts a throwaway Chromium profile so the window lands on the current Space. Account kinds must leave this off. Missing required param → `kind_denied` before Holo.
 
-Dedicated **deskjobs / private-desk Chrome profile** is the default for account kinds: user’s cookies stay in the browser; Holo is less likely to stare at Gmail. Prompt: use that profile, not a random window.
+`browser` is the menu-bar app name from local config (`private-desk setup --browser …`). If unset, prompts get `the default web browser`. Account kinds also interpolate `browser_profile`. Do not hardcode Chrome, Safari, or click coordinates in public kinds.
+
+Dedicated **browser profile** (config `browser_profile`, often a Chrome profile named `private-desk`) is the default for account kinds: user’s cookies stay in that profile. Prompt: use `{browser}` + that profile, not a random window.
 
 ---
 
@@ -308,15 +310,17 @@ Source of truth for Grok Bot. JSON on stdout when `--json` is passed; `--json` i
 
 ```
 private-desk kinds
-private-desk start <kind> [--param key=value ...] [--idempotency-key k]
+private-desk setup [--browser NAME] [--browser-profile NAME] [--repo-url URL]
+private-desk start <kind> [--param key=value ...] [--idempotency-key k] [--wait]
 private-desk get <job_id>
+private-desk wait <job_id>       # laptop tty: poll until not running, then print get
 private-desk status              # running + needs_you
 private-desk cancel <job_id>
 private-desk resume <job_id>     # human finished laptop action
 private-desk doctor              # runtime, permissions, inference, webhook N/A in v1
 ```
 
-`start` returns immediately with the Job (`running`). Do not block until Holo exits. Dummy-files may be so fast the first `get` is already `succeeded`.
+`start` returns immediately with the Job (`running`). Do not block until Holo exits. Dummy-files may be so fast the first `get` is already `succeeded`. Optional `--wait` (and `private-desk wait <id>`) is laptop-tty only: the worker still forks; this process polls until the Job leaves `running` (`needs_you`, `succeeded`, `failed`, `cancelled`) and prints `get`.
 
 Idempotency: if `idempotency_key` matches an in-flight or recently finished job (last 24h), return that Job; do not start a second Holo.
 
@@ -338,7 +342,9 @@ Error:
 }
 ```
 
-`doctor` must not print secrets. Report hosted vs local, whether llama.cpp is reachable, Holo binary. Missing Holo is a **warning** (dummy kinds still work); exit 0. `private-desk doctor --strict` exits 5 if Holo/permissions are not ready. Do not grep `holo doctor` English for permissions. `webhook: not used in v1`.
+`doctor` must not print secrets. Report hosted vs local, whether llama.cpp is reachable, Holo binary, and whether `browser` is set. Missing Holo is a **warning** (dummy kinds still work); exit 0. `private-desk doctor --strict` exits 5 if Holo/permissions are not ready. Do not grep `holo doctor` English for permissions. `webhook: not used in v1`.
+
+`private-desk setup` writes gitignored `config.toml`. Agents ask the human which browser app to use, then pass `--browser` (non-interactive). TTY with no flags walks the same three fields.
 
 `private-desk logs` dumps worker.log only when stdout is a TTY. JSON never includes log text. Remote assistants must not call `logs`.
 
@@ -383,7 +389,8 @@ holo_base_url = "http://127.0.0.1:8080/v1"
 holo_model = "holo3-1-35b"
 artifact_root = "~/Finance/inbox"
 repo_url = "https://github.com/<user>/private-desk"
-browser_profile = "private-desk"    # dedicated Chrome profile name
+browser = "Google Chrome"           # menu-bar app name; from `private-desk setup`
+browser_profile = "private-desk"    # dedicated profile in that browser
 allow_mutating = false
 ```
 

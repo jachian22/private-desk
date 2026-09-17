@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import tomllib
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
+from typing import Any
 from pathlib import Path
 
 from private_desk import paths
@@ -14,7 +15,8 @@ class Config:
     holo_base_url: str = "http://127.0.0.1:8080/v1"
     holo_model: str = "holo3-1-35b"
     artifact_root: str = ""
-    repo_url: str = "https://github.com"
+    repo_url: str = "https://github.com/jachian22/private-desk"
+    browser: str = ""
     browser_profile: str = "private-desk"
     allow_mutating: bool = False
 
@@ -29,6 +31,35 @@ def load_config() -> Config:
         if key in data:
             setattr(cfg, key, data[key])
     return cfg
+
+
+def browser_for_prompt(cfg: Config) -> str:
+    name = (cfg.browser or "").strip()
+    return name if name else "the default web browser"
+
+
+def _toml_scalar(value: Any) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, int) and not isinstance(value, bool):
+        return str(value)
+    text = str(value).replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{text}"'
+
+
+def save_config(cfg: Config) -> Path:
+    """Merge known fields into config.toml. Preserve extra keys the user already set."""
+    path = paths.config_path()
+    existing: dict[str, Any] = {}
+    if path.is_file():
+        existing = tomllib.loads(path.read_text())
+    data = dict(existing)
+    for field in fields(cfg):
+        data[field.name] = getattr(cfg, field.name)
+    lines = [f"{key} = {_toml_scalar(value)}" for key, value in data.items()]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(lines) + "\n")
+    return path
 
 
 def artifact_root_path(cfg: Config) -> Path:

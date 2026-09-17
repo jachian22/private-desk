@@ -59,7 +59,10 @@ def redact_json_text(text: str) -> str:
 
 def event_to_dict(event: Any) -> dict[str, Any]:
     if hasattr(event, "model_dump"):
-        data = event.model_dump()
+        try:
+            data = event.model_dump(mode="json")
+        except TypeError:
+            data = event.model_dump()
         return data if isinstance(data, dict) else {"value": data}
     if isinstance(event, dict):
         return event

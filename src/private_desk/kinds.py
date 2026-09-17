@@ -40,6 +40,9 @@ class Kind:
     params: dict[str, Any]
     dir_template: str
     prompt: str
+    confirm_token: str
+    launch_url: str
+    launch_isolated: bool
     source: Path
 
     def public_view(self, resolved_inference: str) -> dict[str, Any]:
@@ -83,6 +86,9 @@ def _load_file(path: Path) -> Kind:
         params=raw.get("params") or {"type": "object", "additionalProperties": False, "properties": {}},
         dir_template=(artifacts.get("dir_template") or "{artifact_root}/{date}/{kind}"),
         prompt=raw.get("prompt") or "",
+        confirm_token=str(raw.get("confirm_token") or "").strip(),
+        launch_url=str(raw.get("launch_url") or "").strip(),
+        launch_isolated=bool(raw.get("launch_isolated")),
         source=path,
     )
 
@@ -139,9 +145,15 @@ def validate_params(kind: Kind, params: dict[str, Any]) -> dict[str, Any]:
     return params
 
 
-def interpolate_prompt(kind: Kind, params: dict[str, Any], extra: dict[str, str]) -> str:
+def interpolate_template(template: str, params: dict[str, Any], extra: dict[str, str]) -> str:
+    if not (template or "").strip():
+        return ""
     mapping = {**params, **extra}
     try:
-        return kind.prompt.format(**mapping)
+        return template.format(**mapping)
     except KeyError as exc:
-        raise KindError(f"Prompt interpolation missing key {exc}.") from exc
+        raise KindError(f"Kind interpolation missing key {exc}.") from exc
+
+
+def interpolate_prompt(kind: Kind, params: dict[str, Any], extra: dict[str, str]) -> str:
+    return interpolate_template(kind.prompt, params, extra)

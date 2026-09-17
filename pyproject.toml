@@ -15,8 +15,8 @@ dependencies = ["pyyaml>=6.0"]
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
 
-[project.scripts]
-private-desk = "private_desk.cli:main"
+[tool.setuptools]
+script-files = ["scripts/private-desk"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

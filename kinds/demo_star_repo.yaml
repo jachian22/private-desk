@@ -18,11 +18,13 @@ params:
   type: object
   additionalProperties: false
   properties: {}
+confirm_token: starred
+launch_url: "{repo_url}"
 artifacts:
   dir_template: "{artifact_root}/{date}/{kind}"
 prompt: |
-  Open the default browser.
-  Go to {repo_url}
+  {browser} was just opened to {repo_url}. Do not hunt for the app.
+  Do not use Spotlight, Launchpad, Terminal, Cursor, Cmd+Tab, or Mission Control.
   If a login wall appears, do not type passwords or codes. Reply with exactly:
   NEEDS_YOU: needs_login
   Then wait.
@@ -31,5 +33,7 @@ prompt: |
   Then wait.
   If already logged in, click Star on this repository if it is not already starred.
   Do not fork, do not open settings, do not type secrets.
-  When the repo is starred (or already starred), exit.
-
+  When the repo is starred (or already starred), reply with a single line:
+  DONE: starred
+  Then exit.
+  Do not reply DONE if the star action did not complete.

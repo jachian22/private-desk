@@ -1,4 +1,6 @@
-from private_desk.redact import redact
+from datetime import datetime, timezone
+
+from private_desk.redact import event_to_dict, redact
 
 
 def test_redaction_strips_screenshot_amount_and_account():
@@ -23,3 +25,16 @@ def test_redaction_strips_screenshot_amount_and_account():
     assert "[redacted-number]" in out["note"]
     assert "iVBORw0KGgo" not in dumped
     assert "AAAA" not in dumped or "[redacted" in out["content"]
+
+
+def test_event_to_dict_json_mode_datetimes():
+    class FakeEvent:
+        def model_dump(self, mode: str = "python"):
+            stamp = datetime(2026, 8, 28, tzinfo=timezone.utc)
+            if mode == "json":
+                return {"type": "AgentEvent", "timestamp": stamp.isoformat()}
+            return {"type": "AgentEvent", "timestamp": stamp}
+
+    raw = event_to_dict(FakeEvent())
+    assert raw["type"] == "AgentEvent"
+    assert isinstance(raw["timestamp"], str)

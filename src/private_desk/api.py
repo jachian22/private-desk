@@ -4,17 +4,20 @@ import json
 import os
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from shutil import which
 from typing import Any
 
 from private_desk import jobs, paths
-from private_desk.config import load_config
+from private_desk.config import load_config, save_config
 from private_desk.holo_session import holo_importable
 from private_desk.kinds import KindError, get_kind, load_kinds, resolve_inference, validate_params
+from private_desk.local_model import probe_local_model, unavailable_message
 from private_desk.lock import DesktopLock
 from private_desk.proc import kill_tree
+from private_desk.pythonpath import apply_worker_pythonpath
 
 PROTOCOL = jobs.PROTOCOL
 
@@ -47,6 +50,35 @@ def list_kinds() -> Result:
     return _ok(kinds=kinds)
 
 
+def setup_config(
+    *,
+    browser: str | None = None,
+    browser_profile: str | None = None,
+    repo_url: str | None = None,
+) -> Result:
+    """Write browser / profile / repo_url. Agents pass flags; humans can use the TTY wizard."""
+    if not any(v is not None and str(v).strip() for v in (browser, browser_profile, repo_url)):
+        return _err(
+            "kind_denied",
+            'Pass --browser (menu-bar app name), e.g. --browser "Google Chrome".',
+            2,
+        )
+    cfg = load_config()
+    if browser is not None:
+        cfg.browser = browser.strip()
+    if browser_profile is not None:
+        cfg.browser_profile = browser_profile.strip() or cfg.browser_profile
+    if repo_url is not None:
+        cfg.repo_url = repo_url.strip() or cfg.repo_url
+    path = save_config(cfg)
+    return _ok(
+        config_path=str(path),
+        browser=cfg.browser,
+        browser_profile=cfg.browser_profile,
+        repo_url=cfg.repo_url,
+    )
+
+
 def holo_ready(holo_bin: str) -> bool:
     if which(holo_bin) or Path(holo_bin).is_file():
         return True
@@ -73,6 +105,11 @@ def start_job(kind_id: str, params: dict[str, Any] | None, idempotency_key: str 
     if kind.runner == "holo" and not holo_ready(cfg.holo_bin):
         return _err("runtime_unavailable", "holo / holo_desktop is not installed.", 5)
 
+    inference = resolve_inference(kind, cfg)
+    if kind.runner == "holo" and inference == "local":
+        if probe_local_model(cfg.holo_base_url) != "reachable":
+            return _err("runtime_unavailable", unavailable_message(cfg.holo_base_url), 5)
+
     job_id = jobs.new_job_id()
     held = DesktopLock.try_acquire(job_id)
     if held is None:
@@ -80,7 +117,6 @@ def start_job(kind_id: str, params: dict[str, Any] | None, idempotency_key: str 
 
     job = None
     try:
-        inference = resolve_inference(kind, cfg)
         job = jobs.new_job(
             kind=kind.id,
             risk=kind.risk,
@@ -95,6 +131,7 @@ def start_job(kind_id: str, params: dict[str, Any] | None, idempotency_key: str 
         env["PRIVATE_DESK_LOCK_FD"] = str(held.fd)
         if "PRIVATE_DESK_PUBLIC_KINDS" not in env:
             env["PRIVATE_DESK_PUBLIC_KINDS"] = str(paths.public_kinds_dir())
+        apply_worker_pythonpath(env)
         cmd = [sys.executable, "-m", "private_desk.worker", job["job_id"]]
         log = (paths.job_dir(job["job_id"]) / "worker.log").open("ab")
         popen_kw: dict[str, Any] = {
@@ -129,6 +166,17 @@ def get_job(job_id: str) -> Result:
     if not job:
         return _err("not_found", f"Job '{job_id}' not found.", 3)
     return _ok(job=jobs.public_job(job))
+
+
+def wait_job(job_id: str, *, poll_s: float = 1.0) -> Result:
+    """Block until the job leaves running, then return the same payload as get."""
+    while True:
+        result = get_job(job_id)
+        if not result.ok:
+            return result
+        if result.payload["job"].get("state") != "running":
+            return result
+        time.sleep(poll_s)
 
 
 def status_jobs() -> Result:
