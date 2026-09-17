@@ -1,0 +1,49 @@
+#!/usr/bin/env python3
+"""CLI entry. Bootstraps src/ even when macOS hides pip's editable .pth files."""
+from __future__ import annotations
+
+import os
+import sys
+from pathlib import Path
+
+
+def _ensure_src() -> None:
+    candidates: list[Path] = []
+    script = Path(sys.argv[0]).resolve()
+    # repo/.venv/bin/private-desk → repo/src
+    candidates.append(script.parent.parent.parent / "src")
+    candidates.append(Path(sys.prefix).resolve().parent / "src")
+    venv = os.environ.get("VIRTUAL_ENV")
+    if venv:
+        candidates.append(Path(venv).resolve().parent / "src")
+    try:
+        import sysconfig
+
+        purelib = Path(sysconfig.get_path("purelib"))
+        for pth in sorted(purelib.glob("*.pth")):
+            name = pth.name.lower()
+            if "private_desk" not in name and not name.startswith("__editable__"):
+                continue
+            for line in pth.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if line and not line.startswith("#") and " " not in line:
+                    candidates.append(Path(line))
+                    candidates.append(Path(line) / "src")
+    except (OSError, TypeError):
+        pass
+    seen: set[str] = set()
+    for src in candidates:
+        s = str(src)
+        if s in seen:
+            continue
+        seen.add(s)
+        if (src / "private_desk" / "cli.py").is_file() and s not in sys.path:
+            sys.path.insert(0, s)
+            return
+
+
+if __name__ == "__main__":
+    _ensure_src()
+    from private_desk.cli import main
+
+    raise SystemExit(main())

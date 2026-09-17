@@ -19,14 +19,19 @@ class RunnerError(Exception):
         self.message = message
 
 
-def artifact_dir_for(kind: Kind, cfg: Config) -> Path:
+def artifact_dir_for(kind: Kind, cfg: Config, params: dict[str, Any] | None = None) -> Path:
     date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     root = artifact_root_path(cfg)
-    raw = kind.dir_template.format(
+    mapping = {key: str(value) for key, value in (params or {}).items()}
+    mapping.update(
         artifact_root=str(root),
         date=date,
         kind=kind.id,
     )
+    try:
+        raw = kind.dir_template.format(**mapping)
+    except KeyError as exc:
+        raise RunnerError("kind_denied", f"dir_template missing key {exc}.") from exc
     path = Path(raw).expanduser()
     path.mkdir(parents=True, exist_ok=True)
     return path
@@ -80,7 +85,12 @@ def wait_for_resume(job: dict[str, Any], timeout_s: int) -> None:
     raise RunnerError("timeout", "Timed out waiting for the human to resume.")
 
 
-def run_dummy(job: dict[str, Any], kind: Kind, cfg: Config) -> dict[str, Any]:
+def run_dummy(
+    job: dict[str, Any],
+    kind: Kind,
+    cfg: Config,
+    params: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     fake = os.environ.get("PRIVATE_DESK_FAKE_RUNNER")
     if fake == "needs_you":
         jobs.set_state(
@@ -99,7 +109,7 @@ def run_dummy(job: dict[str, Any], kind: Kind, cfg: Config) -> dict[str, Any]:
 
     job["step"] = {"id": "writing_files", "label": "Writing dummy PDFs", "n": 1, "of": 1}
     jobs.write_job(job)
-    artifact_dir = artifact_dir_for(kind, cfg)
+    artifact_dir = artifact_dir_for(kind, cfg, params)
     files = write_dummy_pdfs(artifact_dir)
     return artifacts_payload(artifact_dir, files)
 
@@ -126,5 +136,5 @@ def run_holo(job: dict[str, Any], kind: Kind, cfg: Config, params: dict[str, Any
 
 def run_kind(job: dict[str, Any], kind: Kind, cfg: Config, params: dict[str, Any]) -> dict[str, Any]:
     if kind.runner == "dummy":
-        return run_dummy(job, kind, cfg)
+        return run_dummy(job, kind, cfg, params)
     return run_holo(job, kind, cfg, params)

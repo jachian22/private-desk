@@ -36,6 +36,7 @@ holo-runs/
 *.gguf
 *.gguf.split*
 hai-agent-runtime
+*.local.md
 
 # Logs
 *.log

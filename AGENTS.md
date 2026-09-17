@@ -19,6 +19,8 @@ There is no screenshot, click, type, or `holo run` tool for Grok Bot. The assist
 9. Do not bind `0.0.0.0`. Do not install Holo MCP into Grok Bot.
 10. Tests: `pytest`. Do not hit real banks in CI. Use `PRIVATE_DESK_HOME` so tests never touch the developer’s real config.
 
+Workstreams (separate chats; one plan each): [plans/01-hosted-holo.md](plans/01-hosted-holo.md), [plans/02-local-llama.md](plans/02-local-llama.md), [plans/03-github-session-canary.md](plans/03-github-session-canary.md), [plans/04-private-chase.md](plans/04-private-chase.md).
+
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
@@ -36,16 +38,17 @@ Walk the ladder. Stop when a step is not set up yet. Do not invent Holo prompts.
 
 ```bash
 private-desk doctor
+private-desk setup --browser "Google Chrome"   # menu-bar name; Firefox/Safari/etc. also fine
 private-desk start demo_dummy_files --idempotency-key dummy-$(date +%F)
-private-desk get <job_id>
+private-desk get <job_id>   # or: private-desk start … --wait  (prints get when it leaves running)
 ```
 
 | Step | Command | Needs | Inference |
 | --- | --- | --- | --- |
 | 1 | `start demo_dummy_files` | nothing | n/a |
-| 2 | `start demo_open_repo` | Holo + Screen Recording + Accessibility; laptop will be taken over | **hosted** (screens go to H Company; OK, public page) |
-| 3 | `start demo_star_repo` | step 2 + GitHub login in the browser + `allow_mutating = true` | hosted |
-| 4 | private session canary | local llama.cpp + logged-in site in the `private-desk` Chrome profile | **local** |
+| 2 | `start demo_open_repo` | Holo + Screen Recording + Accessibility; laptop will be taken over; `{browser}` from setup | **hosted** (screens go to H Company; OK, public page) |
+| 3 | `start demo_star_repo` | step 2 + GitHub login in `{browser}` + `allow_mutating = true` | hosted |
+| 4 | private session canary | local llama.cpp + logged-in site in `{browser}` profile `{browser_profile}` | **local** |
 | 5 | private bank kind | step 4 green | **local** |
 
 If `doctor` says Holo is missing, do **step 1 only**. Dummy files still work. Do not run step 2 until they install Holo. `doctor` without `--strict` must not be treated as a hard fail.
@@ -70,12 +73,13 @@ Cron/routines: **message**, do not start Holo. Start only after they say they ar
 You dispatch private-desk on the user's Mac. You never see the desktop.
 
 1. private-desk kinds — then start with kind + params + idempotency key (kind-params-local-date).
-2. Tell them the job id and that the laptop may be taken over.
-3. Hosted inference kinds: warn that screenshots go to H Company. Bank/canary kinds must be local.
-4. may_need_you or bank: ask "are you at the laptop?" before start. Cron must not auto-start.
-5. needs_you: copy user_action.instruction. Do not ask for the code in chat.
-6. succeeded: kind + artifact_dir. Do not read files. Do not start another job unless they ask.
-7. desktop_busy: wait or cancel. Never queue by retry-spamming start.
-8. Never pass secrets. Never use Holo MCP. Never run this on the cloud computer.
-9. Never call private-desk logs. That is laptop tty only.
+2. If doctor says browser is unset, ask which browser app (menu-bar name) and run private-desk setup --browser "…".
+3. Tell them the job id and that the laptop may be taken over.
+4. Hosted inference kinds: warn that screenshots go to H Company. Bank/canary kinds must be local.
+5. may_need_you or bank: ask "are you at the laptop?" before start. Cron must not auto-start.
+6. needs_you: copy user_action.instruction. Do not ask for the code in chat.
+7. succeeded: kind + artifact_dir. Do not read files. Do not start another job unless they ask.
+8. desktop_busy: wait or cancel. Never queue by retry-spamming start.
+9. Never pass secrets. Never use Holo MCP. Never run this on the cloud computer.
+10. Never call private-desk logs. That is laptop tty only.
 ```

@@ -1,9 +1,12 @@
 # Copy to ~/.config/private-desk/kinds/ and fill in YOUR site.
-# Do not commit a live bank kind to this repo.
+# Do not commit a live canary or bank kind to this repo.
 #
-# id: session_canary_example
-# title: Session canary
-# description: Open a site you already use. Pause if login is required. Confirm you are in. Stop.
+# First canary we recommend: GitHub, local inference only.
+# Copy this file to ~/.config/private-desk/kinds/session_canary_github.yaml,
+# set id/title/url_allowlist (https://github.com/ and login URLs), keep
+# inference: local. Do not put those live URLs on a runnable public id here.
+#
+# This file is skipped by the loader (_ prefix).
 id: session_canary_template
 title: Session canary (template — do not run)
 description: Shape only. Copy to private kinds, set url, inference local, may_need_you true.
@@ -23,22 +26,25 @@ denied_actions:
   - wire
   - zelle
   - submit_payment
+  - star
 params:
   type: object
   additionalProperties: false
   properties: {}
 artifacts:
   dir_template: "{artifact_root}/{date}/{kind}"
+# Set this to the site homepage when you copy the file, e.g. https://github.com/
+launch_url: ""
 prompt: |
-  Open Chrome using the dedicated private-desk browser profile from config (browser_profile).
-  Do not use a different profile.
+  {browser} should already be opening the site in profile {browser_profile}.
+  If it is not, open {browser}, switch to the profile named {browser_profile}.
+  Do not use Spotlight, Terminal, Cursor, Guest, Incognito, or a different profile.
   Go to the site named in this private kind's url_allowlist.
-  If you see a login wall, 2FA, captcha, or "confirm it's you", do not type passwords, OTPs, or recovery codes.
+  If you see a login wall, 2FA, passkey prompt, captcha, or "confirm it's you", do not type passwords, OTPs, recovery codes, or passkey PINs.
   Reply with exactly one of:
   NEEDS_YOU: needs_login
   NEEDS_YOU: mfa_required
   NEEDS_YOU: os_permission
-  Then wait.
+  Then wait. A quiet pause still means wait for the human.
   If already logged in, confirm the signed-in home/account chrome is visible, then exit.
-  Do not download statements. Do not open transfers, pay, or settings.
-
+  Do not star. Do not download statements. Do not open transfers, pay, or settings.

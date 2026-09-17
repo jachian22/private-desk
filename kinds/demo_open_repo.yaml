@@ -6,8 +6,8 @@ inference: hosted
 may_need_you: false
 runner: holo
 requires_artifacts: false
-max_steps: 20
-max_time_s: 180
+max_steps: 8
+max_time_s: 120
 url_allowlist:
   - https://github.com/
 denied_actions:
@@ -19,20 +19,21 @@ params:
   type: object
   additionalProperties: false
   properties: {}
+confirm_token: open_repo
+launch_url: "{repo_url}"
+launch_isolated: true
 artifacts:
   dir_template: "{artifact_root}/{date}/{kind}"
 prompt: |
-  You are demonstrating computer-use only.
-  Open the default browser.
-  Go to {repo_url}
-  Stop when the repository page is visible.
-  Do not log in. Do not star. Do not type passwords.
-  Do not open settings, billing, or private pages.
-  If you hit a login wall, 2FA, captcha, or OS permission dialog, do not type secrets.
-  Reply with exactly one of:
+  {browser} was just opened to {repo_url}. Do not click. Do not type.
+  Do not use Spotlight, Launchpad, Terminal, Cursor, the Dock, Cmd+Tab, Mission Control, or the menu bar.
+  Look at the screen. If the public repository page is visible, reply with a single line:
+  DONE: open_repo
+  Then exit.
+  If you only see wallpaper but the menu bar says {browser}, wait; do not click. Look again. Then reply DONE: open_repo if the repo page appeared.
+  If a login wall, 2FA, captcha, or OS permission dialog appears, do not type secrets. Reply with exactly one of:
   NEEDS_YOU: needs_login
   NEEDS_YOU: mfa_required
   NEEDS_YOU: os_permission
   Then wait.
-  When the public repo page is on screen, exit.
-
+  Do not reply DONE if a different site is on screen.
