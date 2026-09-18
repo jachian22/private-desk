@@ -98,6 +98,7 @@ v2 (parked): HTTP MCP, Tailscale/relay, inbound webhooks. Do not bind `0.0.0.0` 
 
 **Skill / routine shape**
 
+- The human speaks in plain language (`star the repo`). The Bot maps that to a kind id; they should not have to paste the CLI.
 - Call `private-desk kinds` rather than guessing params
 - Call `private-desk start …` with an idempotency key (`kind` + params + local date + a unique suffix). Same key within 24h returns the existing Job with `replayed: true` — tell them it already ran. A new ask (“do it again”) needs a new key.
 - Tell the user the job id and that the laptop may be taken over

@@ -28,9 +28,9 @@ private-desk setup --browser "Google Chrome"   # or Safari, Firefox, … — men
 
 If `private-desk` is not found, stop and fix PATH. Do not set `PYTHONPATH=src`.
 
-### Starter prompt (paste into Muse / Grok Bot)
+### Starter prompt (paste into Grok Bot)
 
-Copy the skill in [AGENTS.md](AGENTS.md). Always run on the **local computer**, never the cloud VM. The command is `private-desk`. If it is missing, stop. `doctor` names which app needs Screen Recording (`hai-agent-runtime` plus Terminal, Cursor, iTerm, or whatever spawned this command).
+Copy the skill in [AGENTS.md](AGENTS.md) into the Bot description. Chat in plain language (`star the repo`, `open the repo`, `dummy files`). The Bot runs `private-desk` on the **local computer**. If `doctor` is missing the CLI, keep the clone `.venv/bin` path in the skill.
 
 Optional config: `~/.config/private-desk/config.toml` (never commit this). `setup` writes the same file.
 
