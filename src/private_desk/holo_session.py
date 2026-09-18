@@ -40,8 +40,9 @@ def holo_importable() -> bool:
 
 POLL_WAIT_S = 10
 CONTINUE_PREFIX = (
-    "The human finished the laptop action. The URL was just opened again. "
-    "Look at that window. Do not type passwords or codes. Do not hunt for the app.\n"
+    "The human finished the laptop action. Stay on the browser window they used. "
+    "Do not open a new tab. Look at that window. Do not type passwords or codes. "
+    "Do not hunt for the app.\n"
 )
 
 

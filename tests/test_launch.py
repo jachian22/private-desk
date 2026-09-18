@@ -63,6 +63,7 @@ def test_open_https_isolated_reuse_skips_new_window(tmp_path, monkeypatch):
         return subprocess.CompletedProcess(cmd, 0)
 
     monkeypatch.setattr("private_desk.launch.subprocess.run", fake_run)
+    monkeypatch.setattr("private_desk.launch.isolated_browser_pids", lambda profile=None: [])
     open_https(
         "Google Chrome",
         "https://github.com/example",
@@ -72,6 +73,26 @@ def test_open_https_isolated_reuse_skips_new_window(tmp_path, monkeypatch):
     )
     assert "--new-window" not in seen[0]
     assert "https://github.com/example" in seen[0]
+
+
+def test_open_https_isolated_reuse_skips_when_job_chrome_already_open(tmp_path, monkeypatch):
+    monkeypatch.setenv("PRIVATE_DESK_HOME", str(tmp_path))
+    seen: list[list[str]] = []
+
+    def fake_run(cmd, **kwargs):
+        seen.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0)
+
+    monkeypatch.setattr("private_desk.launch.subprocess.run", fake_run)
+    monkeypatch.setattr("private_desk.launch.isolated_browser_pids", lambda profile=None: [99])
+    open_https(
+        "Google Chrome",
+        "https://github.com/example",
+        settle_s=0,
+        isolated=True,
+        reuse=True,
+    )
+    assert seen == []
 
 
 def test_close_job_browser_only_isolated(monkeypatch):
