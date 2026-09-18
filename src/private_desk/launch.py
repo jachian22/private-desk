@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import os
+import signal
 import subprocess
 import time
+from pathlib import Path
 from urllib.parse import urlparse
 
 from private_desk import paths
@@ -13,18 +16,31 @@ OPEN_BIN = "/usr/bin/open"
 SETTLE_S = 3.0
 _DEFAULT_APP = frozenset({"", "the default web browser", "default"})
 _CHROMIUM = ("chrome", "chromium", "edge", "brave", "arc", "vivaldi", "opera")
+ISOLATED_PROFILE = "holo-launch-profile"
+
+
+def isolated_profile_dir() -> Path:
+    return paths.data_dir() / ISOLATED_PROFILE
 
 
 def _osa_literal(name: str) -> str:
     return name.replace("\\", "\\\\").replace('"', '\\"')
 
 
-def _front_window_script(app: str, url: str) -> str | None:
-    """New window on the current Space. `open -a URL` often adds a tab on another Space."""
+def _front_window_script(app: str, url: str, *, reuse: bool) -> str | None:
+    """New window on the current Space, or navigate the front window on resume."""
     key = app.lower()
     a = _osa_literal(app)
     u = _osa_literal(url)
     if any(name in key for name in _CHROMIUM):
+        if reuse:
+            return (
+                f'tell application "{a}"\n'
+                "  activate\n"
+                "  if (count of windows) is 0 then make new window\n"
+                f'  set URL of active tab of front window to "{u}"\n'
+                "end tell"
+            )
         return (
             f'tell application "{a}"\n'
             "  activate\n"
@@ -33,6 +49,14 @@ def _front_window_script(app: str, url: str) -> str | None:
             "end tell"
         )
     if "safari" in key:
+        if reuse:
+            return (
+                f'tell application "{a}"\n'
+                "  activate\n"
+                "  if (count of documents) is 0 then make new document\n"
+                f'  set URL of document 1 to "{u}"\n'
+                "end tell"
+            )
         return (
             f'tell application "{a}"\n'
             "  activate\n"
@@ -72,21 +96,23 @@ def pin_front_window(app: str) -> None:
     )
 
 
-def _open_isolated_chromium(name: str, url: str) -> None:
-    """New process + profile so the window is not glued to Chrome's other Space."""
-    profile = paths.data_dir() / "holo-launch-profile"
+def _open_isolated_chromium(name: str, url: str, *, reuse: bool) -> None:
+    """Job Chrome: separate user-data-dir so we can quit it without the daily browser."""
+    profile = isolated_profile_dir()
     profile.mkdir(parents=True, exist_ok=True)
+    cmd = [
+        OPEN_BIN,
+        "-na",
+        name,
+        "--args",
+        f"--user-data-dir={profile}",
+        "--no-first-run",
+    ]
+    if not reuse:
+        cmd.append("--new-window")
+    cmd.append(url)
     subprocess.run(
-        [
-            OPEN_BIN,
-            "-na",
-            name,
-            "--args",
-            f"--user-data-dir={profile}",
-            "--no-first-run",
-            "--new-window",
-            url,
-        ],
+        cmd,
         check=True,
         capture_output=True,
         timeout=30,
@@ -99,6 +125,7 @@ def open_https(
     *,
     settle_s: float = SETTLE_S,
     isolated: bool = False,
+    reuse: bool = False,
 ) -> None:
     url = (url or "").strip()
     if not url:
@@ -109,9 +136,13 @@ def open_https(
     name = (app or "").strip()
     try:
         if isolated and any(tag in name.lower() for tag in _CHROMIUM):
-            _open_isolated_chromium(name, url)
+            _open_isolated_chromium(name, url, reuse=reuse)
         else:
-            script = _front_window_script(name, url) if name.lower() not in _DEFAULT_APP else None
+            script = (
+                _front_window_script(name, url, reuse=reuse)
+                if name.lower() not in _DEFAULT_APP
+                else None
+            )
             opened = False
             if script:
                 result = subprocess.run(
@@ -123,7 +154,7 @@ def open_https(
                 opened = result.returncode == 0
             if not opened:
                 _open_fallback(name, url)
-        pin_front_window(name)
+            pin_front_window(name)
     except FileNotFoundError as exc:
         raise RunnerError("runtime_unavailable", "macOS open/osascript is missing.") from exc
     except subprocess.CalledProcessError as exc:
@@ -135,6 +166,41 @@ def open_https(
         raise RunnerError("timeout", "Timed out opening the browser.") from exc
     if settle_s > 0:
         time.sleep(settle_s)
+
+
+def isolated_browser_pids(profile: Path | None = None) -> list[int]:
+    needle = str(profile or isolated_profile_dir())
+    try:
+        proc = subprocess.run(
+            ["pgrep", "-f", needle],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return []
+    pids: list[int] = []
+    me = os.getpid()
+    for token in proc.stdout.split():
+        try:
+            pid = int(token)
+        except ValueError:
+            continue
+        if pid != me:
+            pids.append(pid)
+    return pids
+
+
+def close_job_browser(*, isolated: bool) -> None:
+    """Quit only the job Chrome (isolated profile). Never the daily browser."""
+    if not isolated:
+        return
+    for pid in isolated_browser_pids():
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except OSError:
+            continue
 
 
 def _open_fallback(name: str, url: str) -> None:

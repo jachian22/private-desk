@@ -104,8 +104,8 @@ def test_pause_reopens_launch_url_after_resume(isolated, monkeypatch):
     jobs.resume_path(job["job_id"]).write_text("resume\n")
     opened: list[tuple[str, str, bool]] = []
 
-    def fake_open(app: str, url: str, *, isolated: bool = False, settle_s: float = 0) -> None:
-        opened.append((app, url, isolated))
+    def fake_open(app: str, url: str, *, isolated: bool = False, settle_s: float = 0, reuse: bool = False) -> None:
+        opened.append((app, url, isolated, reuse))
 
     monkeypatch.setattr("private_desk.holo_session.open_https", fake_open)
     client = _Client()
@@ -123,6 +123,6 @@ def test_pause_reopens_launch_url_after_resume(isolated, monkeypatch):
         )
     )
     assert opened == [
-        ("Google Chrome", "https://github.com/jachian22/private-desk", False)
+        ("Google Chrome", "https://github.com/jachian22/private-desk", False, True)
     ]
     assert client.resumed is True

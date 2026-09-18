@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import pytest
 
 from private_desk.config import Config
-from private_desk.doctor import run_doctor
+from private_desk.doctor import run_doctor, spawn_parent_app
 from private_desk.local_model import probe_local_model
 
 
@@ -81,6 +81,25 @@ def test_doctor_reachable_omits_boot_notes(isolated, monkeypatch):
 
 def test_probe_closed_port_is_unreachable():
     assert probe_local_model("http://127.0.0.1:1/v1") == "unreachable"
+
+
+def test_spawn_parent_walks_to_cursor(monkeypatch):
+    rows = {
+        10: ("zsh", 11, "/bin/zsh"),
+        11: ("Cursor", 1, "/Applications/Cursor.app/Contents/MacOS/Cursor"),
+    }
+    monkeypatch.setattr("private_desk.doctor._process_row", lambda pid: rows.get(pid))
+    assert spawn_parent_app(10) == "Cursor"
+
+
+def test_doctor_names_screen_recording_parent(isolated, monkeypatch):
+    monkeypatch.setattr("private_desk.doctor._which", lambda _name: None)
+    monkeypatch.setattr("private_desk.doctor.spawn_parent_app", lambda: "Terminal")
+    payload = run_doctor(strict=False)
+    assert payload["checks"]["spawn_parent"] == "Terminal"
+    joined = "\n".join(payload["notes"])
+    assert "hai-agent-runtime" in joined
+    assert "Terminal" in joined
 
 
 def test_default_repo_url_is_this_repo():

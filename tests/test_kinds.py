@@ -19,6 +19,12 @@ def test_open_repo_kind_has_confirm_token(isolated):
     assert result.payload["error"]["code"] == "kind_denied"
 
 
+def test_star_repo_uses_job_chrome(isolated):
+    kind = load_kinds()["demo_star_repo"]
+    assert kind.launch_url == "{repo_url}"
+    assert kind.launch_isolated is True
+
+
 def test_start_rejects_password_param(isolated):
     result = start_job("demo_dummy_files", {"password": "x"}, None)
     assert result.ok is False

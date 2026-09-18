@@ -11,7 +11,7 @@ from typing import Any
 from private_desk import jobs, paths
 from private_desk.config import Config, browser_for_prompt
 from private_desk.kinds import Kind, interpolate_prompt, interpolate_template
-from private_desk.launch import open_https
+from private_desk.launch import close_job_browser, open_https
 from private_desk.needs_you import (
     answer_text,
     classify_done,
@@ -101,9 +101,16 @@ async def _pause_for_human(
         if alive:
             await client.cancel(session_id)
         raise RunnerError("cancelled", "Job cancelled.")
-    jobs.set_state(job, "running", user_action=None, step=job.get("step"))
+    jobs.set_state(
+        job,
+        "running",
+        user_action=None,
+        step={"id": "holo_run", "label": "Running HoloDesktop", "n": 1, "of": 1},
+    )
     if launch_url:
-        await asyncio.to_thread(open_https, browser, launch_url, isolated=isolated)
+        await asyncio.to_thread(
+            open_https, browser, launch_url, isolated=isolated, reuse=True
+        )
     if alive:
         await _resume_session(client, session_id)
     return alive
@@ -171,9 +178,8 @@ async def _run_session(
         "denied_actions": ", ".join(kind.denied_actions),
     }
     prompt = interpolate_prompt(kind, params, extra)
+    opened_job_browser = False
     launch_url = interpolate_template(kind.launch_url, params, extra)
-    if launch_url:
-        open_https(extra["browser"], launch_url, isolated=kind.launch_isolated)
     job_path = paths.job_dir(job["job_id"])
     raw_log = job_path / "holo-events.raw.jsonl"
     safe_log = job_path / "holo-events.redacted.jsonl"
@@ -192,6 +198,9 @@ async def _run_session(
     client: Any = None
     confirmed = not bool(kind.confirm_token)
     try:
+        if launch_url:
+            open_https(extra["browser"], launch_url, isolated=kind.launch_isolated)
+            opened_job_browser = True
         from holo_desktop.cli.bootstrap import load_holo_env
         from holo_desktop.settings import load_holo_settings
 
@@ -324,6 +333,8 @@ async def _run_session(
                     pass
         if daemon is not None:
             await daemon.aclose()
+        if opened_job_browser:
+            close_job_browser(isolated=kind.launch_isolated)
 
     files = sorted(p.name for p in artifact_dir.iterdir() if p.is_file()) if artifact_dir.exists() else []
     if kind.requires_artifacts and not files:

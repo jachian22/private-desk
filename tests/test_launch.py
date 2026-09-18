@@ -51,8 +51,39 @@ def test_open_https_isolated_chromium(tmp_path, monkeypatch):
     assert "--user-data-dir=" in joined
     assert "--new-window" in seen[0]
     assert "https://github.com/example" in seen[0]
-    assert seen[1][0] == "/usr/bin/osascript"
-    assert "desktopBounds" in seen[1][-1]
+    assert all(cmd[0] != "/usr/bin/osascript" for cmd in seen)
+
+
+def test_open_https_isolated_reuse_skips_new_window(tmp_path, monkeypatch):
+    monkeypatch.setenv("PRIVATE_DESK_HOME", str(tmp_path))
+    seen: list[list[str]] = []
+
+    def fake_run(cmd, **kwargs):
+        seen.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0)
+
+    monkeypatch.setattr("private_desk.launch.subprocess.run", fake_run)
+    open_https(
+        "Google Chrome",
+        "https://github.com/example",
+        settle_s=0,
+        isolated=True,
+        reuse=True,
+    )
+    assert "--new-window" not in seen[0]
+    assert "https://github.com/example" in seen[0]
+
+
+def test_close_job_browser_only_isolated(monkeypatch):
+    killed: list[int] = []
+    monkeypatch.setattr("private_desk.launch.isolated_browser_pids", lambda profile=None: [4242, 4243])
+    monkeypatch.setattr("private_desk.launch.os.kill", lambda pid, sig: killed.append(pid))
+    from private_desk.launch import close_job_browser
+
+    close_job_browser(isolated=False)
+    assert killed == []
+    close_job_browser(isolated=True)
+    assert killed == [4242, 4243]
 
 
 def test_open_https_skips_empty_and_rejects_non_http(monkeypatch):

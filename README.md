@@ -10,9 +10,27 @@ Law: [SPEC.md](SPEC.md). Agents: [AGENTS.md](AGENTS.md). License: [Apache-2.0](L
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
+```
+
+Put `.venv/bin` on PATH in **both** `~/.zprofile` and `~/.zshrc` so login shells and Grok’s local computer can run `private-desk` without `cd` or `PYTHONPATH=src`:
+
+```bash
+# use your clone path
+export PATH="/ABS/PATH/TO/private-desk/.venv/bin:$PATH"
+```
+
+Then:
+
+```bash
 private-desk doctor
 private-desk setup --browser "Google Chrome"   # or Safari, Firefox, … — menu-bar name
 ```
+
+If `private-desk` is not found, stop and fix PATH. Do not set `PYTHONPATH=src`.
+
+### Starter prompt (paste into Muse / Grok Bot)
+
+Copy the skill in [AGENTS.md](AGENTS.md). Always run on the **local computer**, never the cloud VM. The command is `private-desk`. If it is missing, stop. `doctor` names which app needs Screen Recording (`hai-agent-runtime` plus Terminal, Cursor, iTerm, or whatever spawned this command).
 
 Optional config: `~/.config/private-desk/config.toml` (never commit this). `setup` writes the same file.
 
