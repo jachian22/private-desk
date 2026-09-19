@@ -130,7 +130,7 @@ Inbound “POST to a Grok Bot routine URL + sender key” is **not** a v1 depend
 
 ## 6. Onboarding ladder
 
-Agent-guided ([STARTER.md](STARTER.md) + [AGENTS.md](AGENTS.md) + `private-desk doctor`). Each step works if the next is not set up yet. `doctor` JSON includes `onboarding.next` / `ready` / `blocked` so an agent can stop without guessing. Missing Holo is still a warning, not a fail.
+Agent-guided ([STARTER.md](STARTER.md) + [AGENTS.md](AGENTS.md) + `private-desk doctor`). Human-facing site: [private-desk-docs](https://github.com/jachian22/private-desk-docs) (Mintlify). Each step works if the next is not set up yet. `doctor` JSON includes `onboarding.next` / `ready` / `blocked` so an agent can stop without guessing. Missing Holo is still a warning, not a fail.
 
 | Step | Kind | Holo? | Inference | Point |
 | --- | --- | --- | --- | --- |

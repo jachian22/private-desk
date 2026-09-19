@@ -4,6 +4,8 @@ Privacy-preserving desktop jobs for a consumer assistant (Grok Bot first), power
 
 **New Mac?** Paste [STARTER.md](STARTER.md) into Cursor, Codex, or your repo agent. It clones, installs, walks the demo ladder, and stops at each missing layer. Known PATH / permissions / Bot friction is in that file.
 
+Human guide (Mintlify): [jachian22/private-desk-docs](https://github.com/jachian22/private-desk-docs). Preview with `nvm use 22 && mint dev` from that clone (Mintlify does not run on Node 25).
+
 Law: [SPEC.md](SPEC.md). Agents (builders vs already-installed kick): [AGENTS.md](AGENTS.md). License: [Apache-2.0](LICENSE).
 
 ## Install

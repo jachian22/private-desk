@@ -3,7 +3,7 @@
 This file is for **coding agents** (Cursor, Codex, a forker’s agent).
 
 - **First-time Mac:** [STARTER.md](STARTER.md) (paste-in onboarder + known friction).
-- **Humans:** [README.md](README.md). Product law: [SPEC.md](SPEC.md).
+- **Humans:** [README.md](README.md) and [private-desk-docs](https://github.com/jachian22/private-desk-docs) (Mintlify). Product law: [SPEC.md](SPEC.md).
 - **A** — you are changing this repo. **B** — they already cloned; walk the ladder. **Skill** — runtime kicks on an installed CLI.
 
 There is no screenshot, click, type, or `holo run` tool for Grok Bot. The assistant kicks `private-desk` on the **user’s Mac**. Holo stays behind the worker.
@@ -24,7 +24,7 @@ There is no screenshot, click, type, or `holo run` tool for Grok Bot. The assist
 10. Tests: `pytest`. Do not hit real banks in CI. Use `PRIVATE_DESK_HOME` so tests never touch the developer’s real config.
 11. `decide` labels a gate. It never starts a job. Never print `typesafe_api_key` or `AI_GATEWAY_API_KEY`. Formulaic `start` does not need Jev. `npx vercel ai-gateway setup` Keychain is a valid Jev key source.
 
-Local workstream briefs stay in gitignored `plans/`. Product law is SPEC.md + AGENTS.md.
+Local workstream briefs stay in gitignored `plans/`. Product law is SPEC.md + AGENTS.md. Human site is [private-desk-docs](https://github.com/jachian22/private-desk-docs) (Mintlify); do not fork SPEC there.
 
 ```bash
 python3 -m venv .venv

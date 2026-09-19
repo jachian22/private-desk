@@ -1,6 +1,6 @@
 # First-time onboard
 
-**Humans:** this is the paste block for a code agent on a new Mac. Product law: [SPEC.md](SPEC.md). After PATH works, kick jobs from Grok Bot (local computer), not from Cursor.
+**Humans:** this is the paste block for a code agent on a new Mac. Human guide: [private-desk-docs](https://github.com/jachian22/private-desk-docs) (Mintlify). Product law: [SPEC.md](SPEC.md). After PATH works, kick jobs from Grok Bot (local computer), not from Cursor.
 
 **Agents:** you are onboarding this Mac. You are not changing the product unless they ask. Read [SPEC.md](SPEC.md), [AGENTS.md](AGENTS.md), and [README.md](README.md) first. Walk **gates**. Stop when a step is not set up. Run `private-desk doctor` after each install. Use `onboarding.next` from doctor JSON — do not treat a non-strict doctor as a hard fail.
 
