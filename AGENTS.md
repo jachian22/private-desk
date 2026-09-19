@@ -18,7 +18,7 @@ There is no screenshot, click, type, or `holo run` tool for Grok Bot. The assist
 8. Bank / session-canary kinds: `inference: local` only. Hosted Holo is OK for public demos and must stay labeled.
 9. Do not bind `0.0.0.0`. Do not install Holo MCP into Grok Bot.
 10. Tests: `pytest`. Do not hit real banks in CI. Use `PRIVATE_DESK_HOME` so tests never touch the developer’s real config.
-11. `decide` labels a gate. It never starts a job. Never print `typesafe_api_key`. Formulaic `start` does not need TypeSafe.
+11. `decide` labels a gate. It never starts a job. Never print `typesafe_api_key` or `AI_GATEWAY_API_KEY`. Formulaic `start` does not need Jev. `npx vercel ai-gateway setup` Keychain is a valid Jev key source.
 
 Local workstream briefs stay in gitignored `plans/`. Product law is SPEC.md + AGENTS.md.
 
@@ -50,7 +50,7 @@ private-desk get <job_id>   # or: private-desk start … --wait  (prints get whe
 | 2 | `start demo_open_repo` | Holo + Screen Recording + Accessibility; laptop will be taken over; `{browser}` from setup | **hosted** (screens go to H Company; OK, public page) |
 | 3 | `start demo_star_repo` | step 2 + GitHub login in `{browser}` + `allow_mutating = true` | hosted |
 | 3b | `start demo_post_x --param message=…` | at the laptop; daily `{browser}` logged into X; `allow_mutating = true`; canned enum only | hosted (everyday X window) |
-| 3c | `start demo_dino` | at the laptop; Chromium; TypeSafe key; **not Holo**; takes the keyboard in a throwaway profile; Sequoia: App Management for Terminal (the app that ran `private-desk`) so we can launch/quit that Chrome — not Full Disk Access | TypeSafe Nouls (Runner numbers, not screens) |
+| 3c | `start demo_dino` | at the laptop; Chromium; Jev via `AI_GATEWAY_API_KEY`, `npx vercel ai-gateway setup`, or TypeSafe; **not Holo**; takes the keyboard in a throwaway profile; Sequoia: App Management for Terminal (the app that ran `private-desk`) so we can launch/quit that Chrome — not Full Disk Access | Jev Nouls (Runner numbers, not screens) |
 | 4 | private session canary | local llama.cpp + logged-in site in `{browser}` profile `{browser_profile}` | **local** |
 | 5 | private bank kind | step 4 green | **local** |
 
@@ -84,7 +84,7 @@ They might say:
 - open the repo → demo_open_repo (hosted: screenshots go to H Company; laptop may be taken over)
 - star the repo → demo_star_repo (same hosted note; ask if they are at the laptop first)
 - tweet / post to x / get the word out → demo_post_x (hosted, daily browser; ask first; allow_mutating; pass --param message= the sole enum from kinds; new key; never auto-chain after star)
-- chrome dino / dinosaur → demo_dino (NOT Holo; Jev sees Runner numbers via TypeSafe; code taps keys; Chromium; ask first; takes the keyboard; new key; macOS App Management for Terminal if it asks)
+- chrome dino / dinosaur → demo_dino (NOT Holo; Jev sees Runner numbers; code taps keys; Chromium; ask first; takes the keyboard; new key; macOS App Management for Terminal if it asks)
 
 If it is not one of those, run: private-desk decide --utterance "<their words>"
 If decide says ask_first or blocked_by, talk. Do not start.

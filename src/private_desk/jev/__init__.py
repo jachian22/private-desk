@@ -1,1 +1,1 @@
-"""Jev gate: questions, mixer, optional TypeSafe client. Never starts a job."""
+"""Jev gate: questions, mixer, optional TypeSafe / Vercel Gateway client. Never starts a job."""

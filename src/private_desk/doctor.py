@@ -166,12 +166,12 @@ def run_doctor(*, strict: bool = False) -> dict[str, Any]:
     notes = [
         "demo_dummy_files does not need Holo. Missing holo is not a doctor failure.",
         "Public demos demo_open_repo, demo_star_repo, and demo_post_x use hosted Holo (screens go to H Company).",
-        "demo_dino is not Holo: Jev sees Runner numbers, code taps keys over loopback CDP. Needs Chromium + TypeSafe.",
+        "demo_dino is not Holo: Jev sees Runner numbers, code taps keys over loopback CDP. Needs Chromium + Jev (Vercel AI Gateway or TypeSafe).",
         "demo_dino on macOS Sequoia: App Management for the app that ran private-desk (Terminal, Cursor, …) so it can launch and quit the throwaway Chrome. Not Full Disk Access.",
         "Bank and session-canary kinds require local llama.cpp at holo_base_url.",
         "Holo never types passwords. Account kinds use browser + browser_profile from config (private-desk setup).",
         "demo_star_repo and demo_post_x need allow_mutating = true in config.toml.",
-        "decide (Jev-gated asks) and demo_dino need typesafe_api_key or TYPESAFE_API_KEY. Dummy and mapped start still work without it.",
+        "decide (Jev-gated asks) and demo_dino need Jev: AI_GATEWAY_API_KEY, `npx vercel ai-gateway setup` (macOS Keychain), or TYPESAFE_API_KEY. Dummy and mapped start still work without it.",
         screen_recording_note(parent),
     ]
     if holo["holo"] == "missing":

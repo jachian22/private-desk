@@ -124,7 +124,7 @@ def main(argv: list[str] | None = None) -> int:
         "--policy",
         choices=("jev", "scripted"),
         default="jev",
-        help="jev calls TypeSafe. scripted matches known public demos with no key.",
+        help="jev calls Vercel AI Gateway or TypeSafe. scripted matches known public demos with no key.",
     )
 
     p_setup = sub.add_parser(

@@ -11,7 +11,7 @@ from shutil import which
 from typing import Any
 
 from private_desk import jobs, paths
-from private_desk.config import load_config, save_config, typesafe_api_key
+from private_desk.config import jev_configured, load_config, save_config
 from private_desk.holo_session import holo_importable
 from private_desk.kinds import KindError, get_kind, load_kinds, resolve_inference, validate_params
 from private_desk.local_model import probe_local_model, unavailable_message
@@ -108,10 +108,10 @@ def start_job(kind_id: str, params: dict[str, Any] | None, idempotency_key: str 
     if kind.runner == "dino" and not os.environ.get("PRIVATE_DESK_FAKE_RUNNER"):
         from private_desk.launch import is_chromium_app
 
-        if not typesafe_api_key(cfg):
+        if not jev_configured(cfg):
             return _err(
                 "jev_unavailable",
-                "TypeSafe API key is not configured. Formulaic start still works.",
+                "Jev is not configured. Set AI_GATEWAY_API_KEY, run `npx vercel ai-gateway setup`, or set TYPESAFE_API_KEY. Formulaic start still works.",
                 5,
             )
         if not is_chromium_app(cfg.browser):

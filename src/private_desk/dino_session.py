@@ -7,9 +7,9 @@ import time
 from typing import Any
 
 from private_desk import jobs
-from private_desk.config import Config, typesafe_api_key
+from private_desk.config import Config
 from private_desk.dino_cdp import ChromeDinoGame, DinoGame, FakeDinoGame, wait_for_devtools_ws
-from private_desk.jev.client import JevUnavailable, TypeSafeJevClient
+from private_desk.jev.client import JevUnavailable, live_jev_client
 from private_desk.jev.dino import jev_dino_buttons, scripted_dino_buttons
 from private_desk.kinds import Kind
 from private_desk.launch import (
@@ -106,10 +106,10 @@ def run_dino(job: dict[str, Any], kind: Kind, cfg: Config, params: dict[str, Any
             "kind_denied",
             'demo_dino needs a Chromium browser. private-desk setup --browser "Google Chrome"',
         )
-    key = typesafe_api_key(cfg)
-    if not key:
-        raise RunnerError("jev_unavailable", "TypeSafe API key is not configured.")
-    client = TypeSafeJevClient(key)
+    try:
+        client = live_jev_client(cfg)
+    except JevUnavailable as exc:
+        raise RunnerError("jev_unavailable", exc.message) from exc
     game = None
     try:
         open_dino_chrome(browser)

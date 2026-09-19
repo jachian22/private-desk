@@ -68,23 +68,33 @@ RESUME_JS = """
 START_JS = """
 (() => {
   const r = window.Runner && Runner.instance_;
-  if (!r || !r.tRex || r.crashed) return false;
+  if (!r || !r.tRex || r.crashed) return {ok: false};
+  // Automation windows often lose focus; blur pauses the runner.
+  r.onVisibilityChange = function() {};
   r.paused = false;
   if (typeof r.loadSounds === "function") {
     try { r.loadSounds(); } catch (e) {}
   }
   if (typeof r.setPlayStatus === "function") r.setPlayStatus(true);
   else r.playing = true;
+  // Skip the CSS intro (horizon does not move until startGame).
+  if (typeof r.startGame === "function") {
+    try { r.startGame(); } catch (e) {}
+  }
   r.activated = true;
+  r.playingIntro = false;
+  if (r.tRex) r.tRex.playingIntro = false;
   r.updatePending = false;
-  r.time = (typeof performance !== "undefined" && performance.now)
+  const now = (typeof performance !== "undefined" && performance.now)
     ? performance.now()
     : Date.now();
+  r.time = now - 16;
   if (typeof r.update === "function") r.update();
   if (!r.tRex.jumping && !r.tRex.ducking && typeof r.tRex.startJump === "function") {
     r.tRex.startJump(r.currentSpeed || 6);
   }
-  return {playing: !!r.playing, distance: r.distanceRan || 0};
+  if (typeof r.scheduleNextUpdate === "function") r.scheduleNextUpdate();
+  return {ok: true, playing: !!r.playing, distance: r.distanceRan || 0};
 })()
 """
 

@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Protocol
 
-from private_desk.jev.client import TypeSafeJevClient, _noul_of
+from private_desk.jev.client import _noul_of
 
 NOUL_THRESHOLD = 0.5
 
@@ -96,7 +96,11 @@ def scripted_dino_buttons(state: dict[str, Any]) -> DinoButtons:
     return mix_dino(jump_n, duck_n, grounded=grounded)
 
 
-def jev_dino_buttons(client: TypeSafeJevClient, state: dict[str, Any]) -> DinoButtons:
+class DinoJev(Protocol):
+    def ask_response(self, state: dict[str, Any], questions: dict[str, Any]) -> Any: ...
+
+
+def jev_dino_buttons(client: DinoJev, state: dict[str, Any]) -> DinoButtons:
     public = public_dino_state(state)
     response = client.ask_response(public, DINO_QUESTIONS)
     jump = _noul_of(response, "jump")

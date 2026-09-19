@@ -2,7 +2,7 @@ id: demo_dino
 title: Play chrome://dino with Jev
 description: >
   Jev jumps/ducks from Runner numbers (no screenshots). Code taps Space/Down.
-  Not Holo. TypeSafe sees speed and obstacle geometry, not pixels.
+  Not Holo. Jev sees speed and obstacle geometry, not pixels.
   Takes the keyboard in a throwaway Chromium profile.
 risk: read_only
 inference: hosted

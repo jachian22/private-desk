@@ -10,9 +10,9 @@ Law: [SPEC.md](SPEC.md). Agents: [AGENTS.md](AGENTS.md). License: [Apache-2.0](L
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
-# optional: Jev/decide live calls
+# optional: Jev/decide live TypeSafe SDK (skip if using AI_GATEWAY_API_KEY)
 # pip install -e ".[jev]"
-# optional: chrome://dino demo (TypeSafe + loopback CDP; not Holo)
+# optional: chrome://dino demo (loopback CDP; Jev via Gateway or TypeSafe)
 # pip install -e ".[dino]"
 ```
 
@@ -48,7 +48,8 @@ repo_url = "https://github.com/jachian22/private-desk"
 browser = "Google Chrome"           # menu-bar app name; Holo prompts interpolate {browser}
 browser_profile = "private-desk"
 allow_mutating = false
-# typesafe_api_key = ""          # optional; or export TYPESAFE_API_KEY. doctor never prints it
+# ai_gateway_api_key = ""     # optional; or export AI_GATEWAY_API_KEY; or `npx vercel ai-gateway setup` (Keychain). doctor never prints it
+# typesafe_api_key = ""       # optional; or export TYPESAFE_API_KEY. fallback if Gateway is unset
 ```
 
 ## Local llama.cpp (a pet — you start it)
@@ -81,7 +82,7 @@ Add a private bank kind the same way: YAML only under `~/.config/private-desk/ki
 3. `private-desk start demo_open_repo` — hosted Holo, public GitHub page (screens go to H Company)
 4. `private-desk start demo_star_repo` — optional; needs `allow_mutating = true` and a GitHub login
 5. `private-desk start demo_post_x --param message="testing.. this tweet was brought to you by Jev on a private desktop"` — optional; daily browser; ask first; `allow_mutating`; do not invent a different tweet
-6. `private-desk start demo_dino` — optional; **not Holo**; Jev jumps/ducks from Runner numbers; Chromium + TypeSafe; ask first; takes the keyboard. On Sequoia, System Settings → Privacy & Security → App Management for Terminal (launch/quit throwaway Chrome), not Full Disk Access.
+6. `private-desk start demo_dino` — optional; **not Holo**; Jev jumps/ducks from Runner numbers; Chromium + `AI_GATEWAY_API_KEY` (or TypeSafe); ask first; takes the keyboard. On Sequoia, System Settings → Privacy & Security → App Management for Terminal (launch/quit throwaway Chrome), not Full Disk Access.
 7. Private session canary — copy the template to config kinds (GitHub first); local llama.cpp; you log in on the laptop
 8. Private bank kind — local Holo only
 

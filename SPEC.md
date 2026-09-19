@@ -138,7 +138,7 @@ Agent-guided (AGENTS.md + `private-desk doctor`). Each step works if the next is
 | 2 | `demo_open_repo` | Yes | **hosted** (labeled) | Watch the desktop move; public URL |
 | 3 | `demo_star_repo` (optional) | Yes | hosted (labeled) | Mutating encore; needs GitHub session |
 | 3b | `demo_post_x` (optional) | Yes | hosted (labeled) | Canned tweet in the daily browser; `allow_mutating`; ask first |
-| 3c | `demo_dino` (optional) | **No** | TypeSafe Nouls (not Holo) | Jev jumps/ducks from `Runner` numbers; Chromium loopback CDP |
+| 3c | `demo_dino` (optional) | **No** | Jev Nouls (not Holo) | Jev jumps/ducks from `Runner` numbers; Chromium loopback CDP |
 | 4 | Session canary (template; bank instance is **private**) | Yes | **local** | Open the real site; human logs in if needed; confirm session; stop |
 | 5 | Chase (private kind, not shipped) | Yes | **local** | Real job, only after 4 is green |
 
@@ -199,7 +199,7 @@ prompt: |
 
 Bank / session-canary kinds: `inference: local`, `may_need_you: true`. v0 runners refuse `mutating` unless local config `allow_mutating = true`. Grok Bot still asks the user first. `demo_star_repo` and `demo_post_x` are mutating. `demo_post_x` takes one canned `message` enum; Jev does not write the tweet.
 
-`demo_dino` uses `runner: dino`, not Holo. TypeSafe sees speed and obstacle geometry (`Runner.instance_`); code dispatches Space/Down over Chrome DevTools on `127.0.0.1`. No screenshots, no `0.0.0.0`. Needs Chromium plus a TypeSafe key. `may_need_you: true` because it takes the keyboard in a throwaway profile. Job `inference` is `hosted` because TypeSafe is a cloud API — that is not hosted Holo. On macOS Sequoia the spawn parent (Terminal, …) needs **App Management** to launch and quit that throwaway Chrome; that is not rewriting `Google Chrome.app`.
+`demo_dino` uses `runner: dino`, not Holo. Jev sees speed and obstacle geometry (`Runner.instance_`); code dispatches Space/Down over Chrome DevTools on `127.0.0.1`. No screenshots, no `0.0.0.0`. Needs Chromium plus `AI_GATEWAY_API_KEY` (Vercel evaluate, preferred) or `TYPESAFE_API_KEY`. `may_need_you: true` because it takes the keyboard in a throwaway profile. Job `inference` is `hosted` because Jev is a cloud API — that is not hosted Holo. On macOS Sequoia the spawn parent (Terminal, …) needs **App Management** to launch and quit that throwaway Chrome; that is not rewriting `Google Chrome.app`.
 
 The runner interpolates **only** validated params plus `artifact_dir`, `date`, `repo_url`, `browser`, `browser_profile`. Optional `launch_url` uses the same mapping; v0 Holo kinds open an http(s) URL with macOS `open` / AppleScript before Holo. `chrome://dino` is opened only by the dino launcher. `launch_isolated: true` (public open-repo demo) starts a throwaway Chromium profile so the window lands on the current Space. Account kinds must leave this off. Missing required param → `kind_denied` before Holo.
 
@@ -305,7 +305,7 @@ Stable `code` values (extend, don’t reuse):
 | `guardrail` | runner tried a denied action |
 | `bank_unavailable` | site down |
 | `internal` | last resort; no stack traces |
-| `jev_unavailable` | `decide` without a TypeSafe key, missing SDK, or API down; `demo_dino` start without a key. Formulaic `start` still works |
+| `jev_unavailable` | `decide` without a Jev key, missing SDK, or API down; `demo_dino` start without a key. Formulaic `start` still works |
 
 `cancelled` is a state, not an error object.
 
@@ -328,7 +328,7 @@ private-desk doctor              # runtime, permissions, inference, webhook N/A 
 private-desk decide --utterance TEXT [--job-id ID] [--dump-state] [--policy jev|scripted]
 ```
 
-`decide` labels a gate (`start` / `get` / `doctor` / talk). It never forks a worker. Formulaic kinds may still `start` with no TypeSafe key. Jev-gated asks (and `demo_dino`) fail closed (`jev_unavailable`) if the key is missing or the API is down. Secret-shaped utterances are refused in code before any TypeSafe call. Jev sees utterance + public kind cards + Job JSON — never prompts or screens. During `demo_dino`, Jev sees only public `Runner` numbers (no pixels).
+`decide` labels a gate (`start` / `get` / `doctor` / talk). It never forks a worker. Formulaic kinds may still `start` with no Jev key. Jev-gated asks (and `demo_dino`) fail closed (`jev_unavailable`) if no `AI_GATEWAY_API_KEY` / `TYPESAFE_API_KEY` is set, Keychain from `npx vercel ai-gateway setup` is empty, or the API is down. Live Jev prefers Vercel AI Gateway evaluate (`POST …/v4/ai/evaluation-model`, model `typesafe-ai/jev`) over the TypeSafe SDK; it is not OpenAI-compatible chat. On macOS the Gateway key may live in the login Keychain (service `Vercel AI Gateway`) instead of this process's environment. Secret-shaped utterances are refused in code before any Jev call. Jev sees utterance + public kind cards + Job JSON — never prompts or screens. During `demo_dino`, Jev sees only public `Runner` numbers (no pixels). Doctor never prints keys.
 
 `start` returns immediately with the Job (`running`). Do not block until Holo exits. Dummy-files may be so fast the first `get` is already `succeeded`. Optional `--wait` (and `private-desk wait <id>`) is laptop-tty only: the worker still forks; this process polls until the Job leaves `running` (`needs_you`, `succeeded`, `failed`, `cancelled`) and prints `get`. `resume` writes the continue signal and waits until the Job leaves `needs_you` (`running` or terminal). It does not wait for Holo to finish.
 
@@ -366,7 +366,7 @@ Error:
 2. Write `job.json` (public Job). Keep it the only API source of truth. Heartbeat `updated_at`.
 3. Take desktop lock with `fcntl.flock` **before** writing `job.json`. If the lock is held → `desktop_busy` (no ghost job). The worker inherits the lock fd; the lock dies with the worker. No pid/mtime grace.
 4. Materialize `artifact_dir` empty
-5. If kind needs Holo: Python `holo_desktop.agent_client` (pause / resume / cancel). Do not treat `holo run` + wait-for-exit as the engine. Hosted: default runtime. Local: `SpawnConfig(base_url, model)`. `runner: dino` skips Holo: loopback CDP + TypeSafe jump/duck Nouls, then quit the dino profile.
+5. If kind needs Holo: Python `holo_desktop.agent_client` (pause / resume / cancel). Do not treat `holo run` + wait-for-exit as the engine. Hosted: default runtime. Local: `SpawnConfig(base_url, model)`. `runner: dino` skips Holo: loopback CDP + Jev jump/duck Nouls, then quit the dino profile.
 6. Stream events to laptop-only logs. Write a **redacted** copy. Never put Holo events in the Job. Detect `NEEDS_YOU: mfa_required|needs_login|os_permission` (or a pause event type), `pause()` the session, set `needs_you`.
 7. **Pause:** 2FA / permission dialog / login wall. **No `submit_otp` API.** Resume when the human continues **on the laptop** (`private-desk resume <id>`). If the kind has `launch_url`, **reuse** the job browser window (do not open a second one), then `client.resume` (or a new session if Holo already `answer`ed). When the Job is terminal, close **only** that job browser (isolated profile), never the daily browser. Fake runner env is **tests only**.
 8. On success, confirm expected artifacts exist before `succeeded`. If Holo claims done and the dir is empty (for kinds that require files), `failed` / `internal`
@@ -418,7 +418,7 @@ v1 does **not** auto-start llama.cpp. `doctor` checks the URL if local kinds exi
 - Unit: idempotency returns the same `job_id`
 - Unit: second start while lock held → `desktop_busy`
 - Integration: fake runner (no Holo) `running → succeeded` with dummy files
-- Integration: fake dino runner (no Chrome, no TypeSafe) `running → succeeded`
+- Integration: fake dino runner (no Chrome, no Jev) `running → succeeded`
 - Integration: fake runner pauses at login → `needs_you` → `resume` → `succeeded`
 - Integration: cancel during running (worker + child die; lock released)
 - Manual: `private-desk doctor --strict` on a machine without Accessibility; expect non-zero only in strict mode

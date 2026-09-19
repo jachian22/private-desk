@@ -1,9 +1,11 @@
+import json
 import time
 
 from private_desk.api import get_job, list_kinds, start_job
-from private_desk.dino_cdp import FakeDinoGame, loopback_ws_url, wait_for_devtools_ws
+from private_desk.dino_cdp import FakeDinoGame, START_JS, loopback_ws_url, wait_for_devtools_ws
 from private_desk.dino_session import CLEAR_DISTANCE
-from private_desk.jev.dino import mix_dino, public_dino_state, scripted_dino_buttons
+from private_desk.jev.client import VercelGatewayJevClient
+from private_desk.jev.dino import jev_dino_buttons, mix_dino, public_dino_state, scripted_dino_buttons
 from private_desk.kinds import load_kinds
 
 
@@ -34,6 +36,19 @@ def test_dino_safari_denied(isolated, monkeypatch):
     result = start_job("demo_dino", {}, None)
     assert result.ok is False
     assert result.payload["error"]["code"] == "kind_denied"
+
+
+def test_dino_safari_denied_with_gateway_key(isolated, monkeypatch):
+    from private_desk.config import load_config, save_config
+
+    monkeypatch.setenv("AI_GATEWAY_API_KEY", "gw-test")
+    cfg = load_config()
+    cfg.browser = "Safari"
+    save_config(cfg)
+    result = start_job("demo_dino", {}, None)
+    assert result.ok is False
+    assert result.payload["error"]["code"] == "kind_denied"
+    assert "gw-test" not in json.dumps(result.payload)
 
 
 def test_dino_fake_runner_succeeds(isolated, monkeypatch):
@@ -144,3 +159,31 @@ def test_fake_dino_scripted_clears_distance():
             break
     assert snap.get("crashed") is False
     assert float(snap.get("distance") or 0) >= CLEAR_DISTANCE
+
+
+def test_gateway_dino_boolean_maps_to_jump(isolated):
+    def fake_post(url, headers, body, timeout):
+        payload = json.loads(body)
+        assert payload["questions"]["jump"]["type"] == "boolean"
+        assert payload["questions"]["duck"]["type"] == "boolean"
+        return {
+            "answers": {
+                "jump": {"type": "boolean", "probability": 0.8},
+                "duck": {"type": "boolean", "probability": 0.1},
+            }
+        }
+
+    client = VercelGatewayJevClient("gw-secret", post=fake_post)
+    buttons = jev_dino_buttons(
+        client,
+        {"grounded": True, "speed": 6, "nearest_x": 40, "nearest_type": "CACTUS_SMALL"},
+    )
+    assert buttons.jump is True
+    assert buttons.duck is False
+    assert buttons.jump_noul == 0.8
+
+
+def test_start_js_skips_intro_and_blur_pause():
+    assert "startGame" in START_JS
+    assert "onVisibilityChange" in START_JS
+    assert "playingIntro" in START_JS
