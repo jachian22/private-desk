@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any, Protocol
 
@@ -11,14 +12,19 @@ from private_desk.jev.client import JevUnavailable, _noul_of
 NOUL_THRESHOLD = 0.5
 # Live intern: Jev RTT lets a cactus close ~200px. Do not wait on Jev inside this band.
 REFLEX_X = 260.0
-# Optional early Jev ask outside the reflex band.
-JEV_ASK_X = 400.0
+# Ask only while the cactus is still far enough that a Gateway wait leaves reflex time.
+JEV_ASK_MIN = 380.0
+JEV_ASK_MAX = 560.0
+# After the wait, honor a Jev hop only if the cactus has closed into this band.
+JEV_HOP_X = 300.0
 # High birds: duck as soon as they enter the ask band. Do not wait on Jev.
 BIRD_REFLEX_X = 400.0
 JEV_SAVE_X = 180.0
 LATE_JUMP_X = 140.0
 LATE_JUMP_NOUL = 0.40
 LATE_JUMP_LARGE_EXTRA = 40.0
+# gw22: landed, asked Jev at 412, Gateway ate the cactus. Skip new asks after a hop.
+LAND_SKIP_TICKS = 2
 
 DINO_QUESTIONS = {
     "jump": {
@@ -108,11 +114,14 @@ def _is_bird(state: dict[str, Any]) -> bool:
 
 
 def should_ask_jev(state: dict[str, Any]) -> bool:
-    # Live intern is not frozen. A Gateway round-trip closes ~200px, which is
-    # how gw18–gw20 died (ask at 350, discard the hop, cactus arrives first).
-    # Reflex handles jump/duck; Jev can come back once we freeze during asks.
-    del state
-    return False
+    if bool(state.get("jumping")) or not bool(state.get("grounded")):
+        return False
+    if _is_bird(state):
+        return False
+    x = _nearest_x(state)
+    if x is None:
+        return False
+    return JEV_ASK_MIN < x <= JEV_ASK_MAX
 
 
 def bird_is_high(state: dict[str, Any]) -> bool:
@@ -248,15 +257,6 @@ def live_dino_buttons(client: DinoJev, state: dict[str, Any]) -> DinoButtons:
     try:
         buttons = jev_dino_buttons(client, state)
         buttons = apply_late_jump(state, buttons)
-        x = _nearest_x(state)
-        # gw18: Jev jumped at 377, still airborne for the next cactus.
-        if buttons.jump and x is not None and x > REFLEX_X:
-            buttons = DinoButtons(
-                jump=False,
-                duck=buttons.duck,
-                jump_noul=buttons.jump_noul,
-                duck_noul=buttons.duck_noul,
-            )
         print(
             f"dino jev noul_jump={buttons.jump_noul:.2f} noul_duck={buttons.duck_noul:.2f} "
             f"do_jump={buttons.jump} do_duck={buttons.duck} grounded={grounded} "
@@ -281,3 +281,107 @@ def live_dino_buttons(client: DinoJev, state: dict[str, Any]) -> DinoButtons:
         file=sys.stderr,
     )
     return idle
+
+
+def prefer_live_buttons(fresh: dict[str, Any], planned: DinoButtons) -> DinoButtons:
+    """After a Jev wait, the intern has moved. Reflex wins; early hops stay down."""
+    reflex = reflex_buttons(fresh)
+    if reflex is not None:
+        return reflex
+    x = _nearest_x(fresh)
+    if planned.jump and x is not None and x > JEV_HOP_X:
+        return DinoButtons(
+            jump=False,
+            duck=planned.duck,
+            jump_noul=planned.jump_noul,
+            duck_noul=planned.duck_noul,
+        )
+    return planned
+
+
+class LiveDinoLoop:
+    """Reflex on the tick. Jev runs in the background and is applied only if still safe."""
+
+    def __init__(self, client: DinoJev) -> None:
+        self._client = client
+        self._pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="dino-jev")
+        self._fut: Future[DinoButtons] | None = None
+        self._was_jumping = False
+        self._land_skip = 0
+
+    def close(self) -> None:
+        self._pool.shutdown(wait=False, cancel_futures=True)
+
+    def _note_landing(self, state: dict[str, Any]) -> None:
+        jumping = bool(state.get("jumping"))
+        landed = self._was_jumping and not jumping
+        if not jumping and self._land_skip > 0 and not landed:
+            self._land_skip -= 1
+        if landed:
+            self._land_skip = LAND_SKIP_TICKS
+            print("dino land skip asks", file=sys.stderr)
+        self._was_jumping = jumping
+
+    def _harvest(self, state: dict[str, Any]) -> DinoButtons | None:
+        if self._fut is None or not self._fut.done():
+            return None
+        fut = self._fut
+        self._fut = None
+        try:
+            planned = fut.result()
+        except JevUnavailable as exc:
+            print(
+                f"dino jev async failed {exc.message} nearest_x={state.get('nearest_x')}",
+                file=sys.stderr,
+            )
+            if close_enough_to_save(state):
+                return scripted_dino_buttons(state)
+            return None
+        except Exception as exc:
+            print(f"dino jev async error {exc}", file=sys.stderr)
+            return None
+        buttons = apply_late_jump(state, planned)
+        buttons = prefer_live_buttons(state, buttons)
+        print(
+            f"dino jev async noul_jump={buttons.jump_noul:.2f} noul_duck={buttons.duck_noul:.2f} "
+            f"do_jump={buttons.jump} do_duck={buttons.duck} "
+            f"nearest_x={state.get('nearest_x')} type={state.get('nearest_type')}",
+            file=sys.stderr,
+        )
+        return buttons
+
+    def _kick(self, state: dict[str, Any]) -> None:
+        if self._fut is not None:
+            return
+        if self._land_skip > 0:
+            return
+        if not should_ask_jev(state):
+            return
+        payload = dict(state)
+        print(
+            f"dino jev async kick nearest_x={state.get('nearest_x')} "
+            f"type={state.get('nearest_type')}",
+            file=sys.stderr,
+        )
+        self._fut = self._pool.submit(jev_dino_buttons, self._client, payload)
+
+    def decide(self, state: dict[str, Any]) -> DinoButtons:
+        grounded = bool(state.get("grounded"))
+        idle = mix_dino(0.1, 0.1, grounded=grounded)
+        self._note_landing(state)
+        if not obstacle_on_screen(state):
+            return idle
+        reflex = reflex_buttons(state)
+        if reflex is not None:
+            print(
+                f"dino reflex jump={reflex.jump} duck={reflex.duck} "
+                f"nearest_x={state.get('nearest_x')} nearest_y={state.get('nearest_y')} "
+                f"type={state.get('nearest_type')}",
+                file=sys.stderr,
+            )
+            return reflex
+        harvested = self._harvest(state)
+        self._kick(state)
+        if harvested is not None:
+            return harvested
+        return idle

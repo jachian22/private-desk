@@ -9,8 +9,8 @@ inference: hosted
 may_need_you: true
 runner: dino
 requires_artifacts: false
-max_steps: 120
-max_time_s: 90
+max_steps: 500
+max_time_s: 180
 url_allowlist: []
 denied_actions:
   - transfer

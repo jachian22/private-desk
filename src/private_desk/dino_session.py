@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import time
 from typing import Any
 
@@ -11,7 +12,7 @@ from private_desk import jobs
 from private_desk.config import Config
 from private_desk.dino_cdp import ChromeDinoGame, DinoGame, FakeDinoGame, wait_for_devtools_ws
 from private_desk.jev.client import JevUnavailable, live_jev_client
-from private_desk.jev.dino import live_dino_buttons, scripted_dino_buttons
+from private_desk.jev.dino import LiveDinoLoop, prefer_live_buttons, scripted_dino_buttons
 from private_desk.kinds import Kind
 from private_desk.launch import (
     dino_profile_dir,
@@ -32,7 +33,25 @@ def _cancelled(job: dict[str, Any]) -> bool:
     return bool(current and current.get("state") == "cancelled")
 
 
-def _play(job: dict[str, Any], kind: Kind, game: DinoGame, decide) -> dict[str, Any]:
+def _score(snap: dict[str, Any], jumps: int, *, timed_out: bool = False) -> dict[str, Any]:
+    dist = float(snap.get("distance") or 0)
+    return {
+        "distance": dist,
+        "jumps": jumps,
+        "cleared": dist >= CLEAR_DISTANCE,
+        "crashed": bool(snap.get("crashed")),
+        "timed_out": timed_out,
+    }
+
+
+def _play(
+    job: dict[str, Any],
+    kind: Kind,
+    game: DinoGame,
+    decide,
+    *,
+    until_crash: bool = False,
+) -> dict[str, Any]:
     ducking = False
     jumps = 0
     last: dict[str, Any] = {}
@@ -41,6 +60,8 @@ def _play(job: dict[str, Any], kind: Kind, game: DinoGame, decide) -> dict[str, 
         if _cancelled(job):
             raise RunnerError("cancelled", "Job cancelled.")
         if time.time() > deadline:
+            if until_crash and float(last.get("distance") or 0) >= 1:
+                return _score(last, jumps, timed_out=True)
             raise RunnerError("timeout", "Hit max_time_s.")
         snap = game.snapshot()
         last = snap
@@ -64,10 +85,23 @@ def _play(job: dict[str, Any], kind: Kind, game: DinoGame, decide) -> dict[str, 
             continue
         if snap.get("crashed"):
             dist = float(snap.get("distance") or 0)
+            if until_crash and dist >= 1:
+                print(f"dino score={dist} jumps={jumps} crashed=True", file=sys.stderr)
+                return _score(snap, jumps)
             if dist >= CLEAR_DISTANCE:
-                return {"distance": dist, "jumps": jumps, "cleared": True, "crashed": True}
+                return _score(snap, jumps)
             raise RunnerError("model_error", "Dino crashed before clearing the first obstacles.")
         buttons = decide(snap)
+        if until_crash:
+            fresh = game.snapshot()
+            last = fresh
+            if fresh.get("crashed"):
+                dist = float(fresh.get("distance") or 0)
+                if dist >= 1:
+                    print(f"dino score={dist} jumps={jumps} crashed=True", file=sys.stderr)
+                    return _score(fresh, jumps)
+                raise RunnerError("model_error", "Dino crashed before clearing the first obstacles.")
+            buttons = prefer_live_buttons(fresh, buttons)
         if buttons.jump:
             game.tap_jump()
             jumps += 1
@@ -84,11 +118,17 @@ def _play(job: dict[str, Any], kind: Kind, game: DinoGame, decide) -> dict[str, 
         time.sleep(TICK_S)
         last = game.snapshot()
         dist = float(last.get("distance") or 0)
-        if dist >= CLEAR_DISTANCE:
-            return {"distance": dist, "jumps": jumps, "cleared": True, "crashed": False}
+        if last.get("crashed") and until_crash and dist >= 1:
+            print(f"dino score={dist} jumps={jumps} crashed=True", file=sys.stderr)
+            return _score(last, jumps)
+        if dist >= CLEAR_DISTANCE and not until_crash:
+            return _score(last, jumps)
     dist = float(last.get("distance") or 0)
+    if until_crash and dist >= 1:
+        print(f"dino score={dist} jumps={jumps} timed_out=True", file=sys.stderr)
+        return _score(last, jumps, timed_out=True)
     if dist >= CLEAR_DISTANCE:
-        return {"distance": dist, "jumps": jumps, "cleared": True, "crashed": False}
+        return _score(last, jumps)
     raise RunnerError("timeout", "Hit max_steps before clearing chrome://dino.")
 
 
@@ -113,21 +153,25 @@ def run_dino(job: dict[str, Any], kind: Kind, cfg: Config, params: dict[str, Any
     except JevUnavailable as exc:
         raise RunnerError("jev_unavailable", exc.message) from exc
     game = None
+    loop: LiveDinoLoop | None = None
     try:
         open_dino_chrome(browser)
         ws = wait_for_devtools_ws(dino_profile_dir())
         game = ChromeDinoGame(ws)
-        result = _play(job, kind, game, lambda snap: live_dino_buttons(client, snap))
+        loop = LiveDinoLoop(client)
+        result = _play(job, kind, game, loop.decide, until_crash=True)
         (artifact_dir / "run.json").write_text(json.dumps(result) + "\n")
         return artifacts_payload(artifact_dir, ["run.json"])
     except JevUnavailable as exc:
         raise RunnerError("jev_unavailable", exc.message) from exc
     finally:
+        if loop is not None:
+            loop.close()
         if game is not None:
             try:
-                game.hold()
+                game.resume()
             except RunnerError:
                 pass
             game.close()
-        # Leave the throwaway Chrome frozen on the ground, last frame.
+        # Leave the throwaway Chrome running so we can see the intern after the job.
         # The next demo_dino start still kills this profile before launching.

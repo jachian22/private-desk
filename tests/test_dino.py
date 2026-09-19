@@ -371,7 +371,7 @@ def test_layout_reset_keeps_trex_on_screen():
     assert "querySelector('.runner-container')" in LAYOUT_RESET_WINDOW_JS
 
 
-def test_jev_asked_when_cactus_is_on_screen():
+def test_jev_asked_when_cactus_is_still_far():
     from types import SimpleNamespace
 
     from private_desk.jev.dino import live_dino_buttons
@@ -382,7 +382,7 @@ def test_jev_asked_when_cactus_is_on_screen():
 
         def ask_response(self, state, questions):
             self.called = True
-            assert state.get("nearest_x") == 320
+            assert state.get("nearest_x") == 450
             return SimpleNamespace(
                 nouls={
                     "jump": SimpleNamespace(noul=0.8),
@@ -393,9 +393,23 @@ def test_jev_asked_when_cactus_is_on_screen():
     client = Capture()
     buttons = live_dino_buttons(
         client,
+        {"grounded": True, "speed": 6, "nearest_x": 450, "nearest_type": "CACTUS_SMALL"},
+    )
+    assert client.called is True
+    assert buttons.jump is True
+
+
+def test_jev_not_asked_in_mid_band():
+    from private_desk.jev.dino import live_dino_buttons
+
+    class Boom:
+        def ask_response(self, state, questions):
+            raise AssertionError("mid-band cactus should wait for reflex, not Jev")
+
+    buttons = live_dino_buttons(
+        Boom(),
         {"grounded": True, "speed": 6, "nearest_x": 320, "nearest_type": "CACTUS_SMALL"},
     )
-    assert client.called is False
     assert buttons.jump is False
 
 
@@ -420,6 +434,22 @@ def test_jev_jump_at_377_is_ignored():
     assert buttons.jump is False
 
 
+def test_prefer_live_buttons_drops_early_hop():
+    from private_desk.jev.dino import mix_dino, prefer_live_buttons
+
+    planned = mix_dino(0.8, 0.05, grounded=True)
+    held = prefer_live_buttons(
+        {"grounded": True, "jumping": False, "nearest_x": 420, "nearest_type": "cactusSmall"},
+        planned,
+    )
+    assert held.jump is False
+    hop = prefer_live_buttons(
+        {"grounded": True, "jumping": False, "nearest_x": 280, "nearest_type": "cactusSmall"},
+        planned,
+    )
+    assert hop.jump is True
+
+
 def test_jev_skipped_when_cactus_is_far():
     from private_desk.jev.dino import live_dino_buttons
 
@@ -429,7 +459,7 @@ def test_jev_skipped_when_cactus_is_far():
 
     buttons = live_dino_buttons(
         Boom(),
-        {"grounded": True, "speed": 6, "nearest_x": 520, "nearest_type": "CACTUS_SMALL"},
+        {"grounded": True, "speed": 6, "nearest_x": 600, "nearest_type": "CACTUS_SMALL"},
     )
     assert buttons.jump is False
 
@@ -497,7 +527,7 @@ def test_dino_gateway_flake_does_not_jump_when_far():
 
     buttons = live_dino_buttons(
         Limited(),
-        {"grounded": True, "speed": 6, "nearest_x": 520, "nearest_type": "CACTUS_SMALL"},
+        {"grounded": True, "speed": 6, "nearest_x": 600, "nearest_type": "CACTUS_SMALL"},
     )
     assert buttons.jump is False
 
@@ -508,6 +538,108 @@ def test_snapshot_uses_intern_scoreboard_units():
     assert "getActualDistance" in SNAPSHOT_JS
     assert "0.025" in SNAPSHOT_JS
     assert "r.playing = false" not in SNAPSHOT_JS
+
+
+def test_live_loop_does_not_block_on_jev():
+    import time
+    from types import SimpleNamespace
+
+    from private_desk.jev.dino import LiveDinoLoop
+
+    class Slow:
+        def ask_response(self, state, questions):
+            time.sleep(0.25)
+            return SimpleNamespace(
+                nouls={
+                    "jump": SimpleNamespace(noul=0.8),
+                    "duck": SimpleNamespace(noul=0.1),
+                }
+            )
+
+    loop = LiveDinoLoop(Slow())
+    try:
+        far = {
+            "grounded": True,
+            "jumping": False,
+            "speed": 6,
+            "nearest_x": 450,
+            "nearest_type": "cactusSmall",
+        }
+        first = loop.decide(far)
+        assert first.jump is False
+        t0 = time.time()
+        mid = loop.decide(far)
+        assert time.time() - t0 < 0.1
+        assert mid.jump is False
+        time.sleep(0.3)
+        hop = loop.decide(
+            {
+                "grounded": True,
+                "jumping": False,
+                "speed": 6,
+                "nearest_x": 280,
+                "nearest_type": "cactusSmall",
+            }
+        )
+        assert hop.jump is True
+    finally:
+        loop.close()
+
+
+def test_live_loop_skips_jev_for_two_ticks_after_landing():
+    from types import SimpleNamespace
+
+    from private_desk.jev.dino import LiveDinoLoop
+
+    class Capture:
+        def __init__(self) -> None:
+            self.n = 0
+
+        def ask_response(self, state, questions):
+            self.n += 1
+            return SimpleNamespace(
+                nouls={
+                    "jump": SimpleNamespace(noul=0.8),
+                    "duck": SimpleNamespace(noul=0.1),
+                }
+            )
+
+    client = Capture()
+    loop = LiveDinoLoop(client)
+    try:
+        air = {
+            "grounded": False,
+            "jumping": True,
+            "speed": 6,
+            "nearest_x": 450,
+            "nearest_type": "cactusSmall",
+        }
+        land = {
+            "grounded": True,
+            "jumping": False,
+            "speed": 6,
+            "nearest_x": 412,
+            "nearest_type": "cactusSmall",
+        }
+        loop.decide(air)
+        loop.decide(land)
+        loop.decide(land)
+        assert client.n == 0
+        loop.decide(
+            {
+                "grounded": True,
+                "jumping": False,
+                "speed": 6,
+                "nearest_x": 450,
+                "nearest_type": "cactusSmall",
+            }
+        )
+        deadline = time.time() + 1.0
+        while client.n == 0 and time.time() < deadline:
+            time.sleep(0.02)
+        assert client.n == 1
+    finally:
+        loop.close()
 
 
 def test_handler_object_ids_reads_cdp_listeners():
