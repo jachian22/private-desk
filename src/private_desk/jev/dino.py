@@ -9,11 +9,16 @@ from typing import Any, Protocol
 from private_desk.jev.client import JevUnavailable, _noul_of
 
 NOUL_THRESHOLD = 0.5
-# Intern nearest_x: cactus spawns ~600. Jump window is much closer.
-# Asking from spawn burned Gateway and jumped into empty space (gw10).
-JEV_ASK_X = 220.0
-# If evaluate 429s inside this band, jump locally so the cactus is not free.
+# Live intern: Jev RTT lets a cactus close ~200px. Do not wait on Jev inside this band.
+REFLEX_X = 260.0
+# Optional early Jev ask outside the reflex band.
+JEV_ASK_X = 400.0
+# High birds: duck as soon as they enter the ask band. Do not wait on Jev.
+BIRD_REFLEX_X = 400.0
 JEV_SAVE_X = 180.0
+LATE_JUMP_X = 140.0
+LATE_JUMP_NOUL = 0.40
+LATE_JUMP_LARGE_EXTRA = 40.0
 
 DINO_QUESTIONS = {
     "jump": {
@@ -103,12 +108,49 @@ def _is_bird(state: dict[str, Any]) -> bool:
 
 
 def should_ask_jev(state: dict[str, Any]) -> bool:
-    if bool(state.get("jumping")):
+    # Live intern is not frozen. A Gateway round-trip closes ~200px, which is
+    # how gw18–gw20 died (ask at 350, discard the hop, cactus arrives first).
+    # Reflex handles jump/duck; Jev can come back once we freeze during asks.
+    del state
+    return False
+
+
+def bird_is_high(state: dict[str, Any]) -> bool:
+    y = state.get("nearest_y")
+    if y is None:
+        return True
+    try:
+        return float(y) < 75
+    except (TypeError, ValueError):
+        return True
+
+
+def cactus_is_imminent(state: dict[str, Any]) -> bool:
+    if bool(state.get("jumping")) or not bool(state.get("grounded")) or _is_bird(state):
+        return False
+    x = _nearest_x(state)
+    return x is not None and x <= REFLEX_X
+
+
+def bird_is_imminent(state: dict[str, Any]) -> bool:
+    if bool(state.get("jumping")) or not _is_bird(state):
         return False
     x = _nearest_x(state)
     if x is None:
         return False
-    return x <= JEV_ASK_X
+    if bird_is_high(state):
+        return x <= BIRD_REFLEX_X
+    return x <= REFLEX_X
+
+
+def reflex_buttons(state: dict[str, Any]) -> DinoButtons | None:
+    if bird_is_imminent(state):
+        if bird_is_high(state):
+            return mix_dino(0.1, 0.9, grounded=True)
+        return mix_dino(0.9, 0.1, grounded=True)
+    if cactus_is_imminent(state):
+        return mix_dino(0.9, 0.1, grounded=True)
+    return None
 
 
 def close_enough_to_save(state: dict[str, Any]) -> bool:
@@ -116,6 +158,35 @@ def close_enough_to_save(state: dict[str, Any]) -> bool:
         return False
     x = _nearest_x(state)
     return x is not None and x <= JEV_SAVE_X
+
+
+def apply_late_jump(state: dict[str, Any], buttons: DinoButtons) -> DinoButtons:
+    """If Jev is weakly yes and the cactus is already late, jump."""
+    if buttons.jump or bool(state.get("jumping")) or not bool(state.get("grounded")):
+        return buttons
+    if _is_bird(state):
+        return buttons
+    x = _nearest_x(state)
+    if x is None or buttons.jump_noul < LATE_JUMP_NOUL:
+        return buttons
+    horizon = LATE_JUMP_X
+    kind = str(state.get("nearest_type") or "").upper()
+    if "LARGE" in kind:
+        horizon += LATE_JUMP_LARGE_EXTRA
+    width = state.get("nearest_width")
+    if width is not None:
+        try:
+            horizon = max(horizon, LATE_JUMP_X + float(width))
+        except (TypeError, ValueError):
+            pass
+    if x > horizon:
+        return buttons
+    return DinoButtons(
+        jump=True,
+        duck=False,
+        jump_noul=buttons.jump_noul,
+        duck_noul=buttons.duck_noul,
+    )
 
 
 def scripted_dino_buttons(state: dict[str, Any]) -> DinoButtons:
@@ -156,26 +227,46 @@ def live_dino_buttons(client: DinoJev, state: dict[str, Any]) -> DinoButtons:
     idle = mix_dino(0.1, 0.1, grounded=grounded)
     if not obstacle_on_screen(state):
         return idle
+    reflex = reflex_buttons(state)
+    if reflex is not None:
+        print(
+            f"dino reflex jump={reflex.jump} duck={reflex.duck} "
+            f"nearest_x={state.get('nearest_x')} nearest_y={state.get('nearest_y')} "
+            f"type={state.get('nearest_type')}",
+            file=sys.stderr,
+        )
+        return reflex
     if not should_ask_jev(state):
         print(
             f"dino jev skip jumping={bool(state.get('jumping'))} "
-            f"nearest_x={state.get('nearest_x')} type={state.get('nearest_type')}",
+            f"nearest_x={state.get('nearest_x')} nearest_y={state.get('nearest_y')} "
+            f"type={state.get('nearest_type')}",
             file=sys.stderr,
         )
         return idle
     last_exc: JevUnavailable | None = None
-    for _ in range(2):
-        try:
-            buttons = jev_dino_buttons(client, state)
-            print(
-                f"dino jev noul_jump={buttons.jump_noul:.2f} noul_duck={buttons.duck_noul:.2f} "
-                f"do_jump={buttons.jump} grounded={grounded} jumping={bool(state.get('jumping'))} "
-                f"nearest_x={state.get('nearest_x')} type={state.get('nearest_type')}",
-                file=sys.stderr,
+    try:
+        buttons = jev_dino_buttons(client, state)
+        buttons = apply_late_jump(state, buttons)
+        x = _nearest_x(state)
+        # gw18: Jev jumped at 377, still airborne for the next cactus.
+        if buttons.jump and x is not None and x > REFLEX_X:
+            buttons = DinoButtons(
+                jump=False,
+                duck=buttons.duck,
+                jump_noul=buttons.jump_noul,
+                duck_noul=buttons.duck_noul,
             )
-            return buttons
-        except JevUnavailable as exc:
-            last_exc = exc
+        print(
+            f"dino jev noul_jump={buttons.jump_noul:.2f} noul_duck={buttons.duck_noul:.2f} "
+            f"do_jump={buttons.jump} do_duck={buttons.duck} grounded={grounded} "
+            f"jumping={bool(state.get('jumping'))} nearest_x={state.get('nearest_x')} "
+            f"nearest_y={state.get('nearest_y')} type={state.get('nearest_type')}",
+            file=sys.stderr,
+        )
+        return buttons
+    except JevUnavailable as exc:
+        last_exc = exc
     if close_enough_to_save(state):
         buttons = scripted_dino_buttons(state)
         print(

@@ -268,8 +268,8 @@ def open_dino_chrome(app: str, *, settle_s: float = SETTLE_S) -> None:
     stale = profile / "DevToolsActivePort"
     if stale.is_file():
         stale.unlink(missing_ok=True)
-    # --app avoids the NTP tab. Positional chrome://dino plus a default
-    # new-tab is what opened the extra tab. `open` would still hit daily Chrome.
+    # Same as a normal tab: chrome://dino intern, Chrome's own 600x150 + Retina
+    # scale. --app / force-device-scale-factor / CSS scale() is what distorted it.
     cmd = [
         str(chromium_macos_binary(name)),
         f"--user-data-dir={profile.resolve()}",
@@ -278,7 +278,8 @@ def open_dino_chrome(app: str, *, settle_s: float = SETTLE_S) -> None:
         "--remote-debugging-address=127.0.0.1",
         "--remote-debugging-port=0",
         "--remote-allow-origins=*",
-        "--app=chrome://dino/",
+        "--new-window",
+        "chrome://dino/",
     ]
     err_path = profile / "cdp.stderr.log"
     try:

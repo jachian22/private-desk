@@ -206,11 +206,169 @@ def test_gateway_dino_boolean_maps_to_jump(isolated):
     assert buttons.jump_noul == 0.8
 
 
+def test_late_jump_when_weak_noul_and_cactus_is_close():
+    from private_desk.jev.dino import apply_late_jump, mix_dino
+
+    state = {
+        "grounded": True,
+        "jumping": False,
+        "nearest_x": 100,
+        "nearest_type": "cactusSmall",
+    }
+    weak = mix_dino(0.46, 0.05, grounded=True)
+    assert weak.jump is False
+    late = apply_late_jump(state, weak)
+    assert late.jump is True
+
+
+def test_late_jump_saves_gw12_small_cactus():
+    from private_desk.jev.dino import apply_late_jump, mix_dino
+
+    # gw12: 0.47 at 122, then crash on the next tick.
+    state = {
+        "grounded": True,
+        "jumping": False,
+        "nearest_x": 122,
+        "nearest_type": "cactusSmall",
+    }
+    assert apply_late_jump(state, mix_dino(0.47, 0.06, grounded=True)).jump is True
+
+
+def test_late_jump_large_cactus_gets_more_lead():
+    from private_desk.jev.dino import apply_late_jump, mix_dino
+
+    state = {
+        "grounded": True,
+        "jumping": False,
+        "nearest_x": 154,
+        "nearest_type": "cactusLarge",
+    }
+    assert apply_late_jump(state, mix_dino(0.42, 0.05, grounded=True)).jump is True
+
+
+def test_late_jump_does_not_fire_when_cactus_is_still_far():
+    from private_desk.jev.dino import apply_late_jump, mix_dino
+
+    state = {
+        "grounded": True,
+        "jumping": False,
+        "nearest_x": 220,
+        "nearest_type": "cactusSmall",
+    }
+    weak = mix_dino(0.46, 0.05, grounded=True)
+    assert apply_late_jump(state, weak).jump is False
+
+
 def test_start_js_skips_intro_and_blur_pause():
     assert "startGame" in START_JS
     assert "onVisibilityChange" in START_JS
     assert "playingIntro" in START_JS
     assert "startJump" not in START_JS
+    assert 'width = "600px"' in START_JS or "600px" in START_JS
+
+
+def test_reflex_jumps_without_jev_when_cactus_is_imminent():
+    from private_desk.jev.dino import live_dino_buttons
+
+    class Boom:
+        def ask_response(self, state, questions):
+            raise AssertionError("Jev must not block inside the reflex band")
+
+    buttons = live_dino_buttons(
+        Boom(),
+        {
+            "grounded": True,
+            "jumping": False,
+            "speed": 6,
+            "nearest_x": 216,
+            "nearest_type": "cactusLarge",
+        },
+    )
+    assert buttons.jump is True
+
+
+def test_reflex_ducks_high_bird():
+    from private_desk.jev.dino import live_dino_buttons
+
+    class Boom:
+        def ask_response(self, state, questions):
+            raise AssertionError("high bird should duck without Jev")
+
+    buttons = live_dino_buttons(
+        Boom(),
+        {
+            "grounded": True,
+            "jumping": False,
+            "nearest_x": 146,
+            "nearest_y": 50,
+            "nearest_type": "pterodactyl",
+        },
+    )
+    assert buttons.duck is True
+    assert buttons.jump is False
+
+
+def test_reflex_ducks_high_bird_before_jev_band():
+    from private_desk.jev.dino import live_dino_buttons
+
+    class Boom:
+        def ask_response(self, state, questions):
+            raise AssertionError("gw19: do not wait on Jev for a high bird")
+
+    buttons = live_dino_buttons(
+        Boom(),
+        {
+            "grounded": True,
+            "jumping": False,
+            "nearest_x": 329,
+            "nearest_y": 50,
+            "nearest_type": "pterodactyl",
+        },
+    )
+    assert buttons.duck is True
+    assert buttons.jump is False
+
+
+def test_low_bird_waits_then_jumps_locally():
+    from private_desk.jev.dino import live_dino_buttons
+
+    class Boom:
+        def ask_response(self, state, questions):
+            raise AssertionError("low bird is local, not Jev")
+
+    wait = live_dino_buttons(
+        Boom(),
+        {
+            "grounded": True,
+            "jumping": False,
+            "nearest_x": 329,
+            "nearest_y": 100,
+            "nearest_type": "pterodactyl",
+        },
+    )
+    assert wait.jump is False
+    assert wait.duck is False
+    hop = live_dino_buttons(
+        Boom(),
+        {
+            "grounded": True,
+            "jumping": False,
+            "nearest_x": 216,
+            "nearest_y": 100,
+            "nearest_type": "pterodactyl",
+        },
+    )
+    assert hop.jump is True
+
+
+def test_layout_reset_keeps_trex_on_screen():
+    from private_desk.dino_cdp import LAYOUT_RESET_JS, LAYOUT_RESET_WINDOW_JS
+
+    assert "left top" in LAYOUT_RESET_JS
+    assert "padL" in LAYOUT_RESET_JS
+    assert "margin = '0'" in LAYOUT_RESET_JS
+    assert "querySelector('.runner-container')" in LAYOUT_RESET_JS
+    assert "querySelector('.runner-container')" in LAYOUT_RESET_WINDOW_JS
 
 
 def test_jev_asked_when_cactus_is_on_screen():
@@ -224,7 +382,7 @@ def test_jev_asked_when_cactus_is_on_screen():
 
         def ask_response(self, state, questions):
             self.called = True
-            assert state.get("nearest_x") == 180
+            assert state.get("nearest_x") == 320
             return SimpleNamespace(
                 nouls={
                     "jump": SimpleNamespace(noul=0.8),
@@ -235,10 +393,31 @@ def test_jev_asked_when_cactus_is_on_screen():
     client = Capture()
     buttons = live_dino_buttons(
         client,
-        {"grounded": True, "speed": 6, "nearest_x": 180, "nearest_type": "CACTUS_SMALL"},
+        {"grounded": True, "speed": 6, "nearest_x": 320, "nearest_type": "CACTUS_SMALL"},
     )
-    assert client.called is True
-    assert buttons.jump is True
+    assert client.called is False
+    assert buttons.jump is False
+
+
+def test_jev_jump_at_377_is_ignored():
+    from types import SimpleNamespace
+
+    from private_desk.jev.dino import live_dino_buttons
+
+    class Capture:
+        def ask_response(self, state, questions):
+            return SimpleNamespace(
+                nouls={
+                    "jump": SimpleNamespace(noul=0.52),
+                    "duck": SimpleNamespace(noul=0.05),
+                }
+            )
+
+    buttons = live_dino_buttons(
+        Capture(),
+        {"grounded": True, "speed": 6, "nearest_x": 377, "nearest_type": "cactusSmall"},
+    )
+    assert buttons.jump is False
 
 
 def test_jev_skipped_when_cactus_is_far():
@@ -250,7 +429,7 @@ def test_jev_skipped_when_cactus_is_far():
 
     buttons = live_dino_buttons(
         Boom(),
-        {"grounded": True, "speed": 6, "nearest_x": 400, "nearest_type": "CACTUS_SMALL"},
+        {"grounded": True, "speed": 6, "nearest_x": 520, "nearest_type": "CACTUS_SMALL"},
     )
     assert buttons.jump is False
 
@@ -318,7 +497,7 @@ def test_dino_gateway_flake_does_not_jump_when_far():
 
     buttons = live_dino_buttons(
         Limited(),
-        {"grounded": True, "speed": 6, "nearest_x": 400, "nearest_type": "CACTUS_SMALL"},
+        {"grounded": True, "speed": 6, "nearest_x": 520, "nearest_type": "CACTUS_SMALL"},
     )
     assert buttons.jump is False
 
@@ -328,6 +507,7 @@ def test_snapshot_uses_intern_scoreboard_units():
 
     assert "getActualDistance" in SNAPSHOT_JS
     assert "0.025" in SNAPSHOT_JS
+    assert "r.playing = false" not in SNAPSHOT_JS
 
 
 def test_handler_object_ids_reads_cdp_listeners():

@@ -151,8 +151,6 @@ _SNAPSHOT_BODY = """
     runningTime: r.runningTime || 0,
     playing: !!(r.activated || r.playing || raw > 0),
   };
-  // Freeze the intern so Jev sees one frame. playing above stays "in a run".
-  if ((r.distanceRan || 0) > 0) r.playing = false;
   return out;
 """
 
@@ -176,6 +174,47 @@ _RESUME_BODY = """
 RESUME_JS = _on_instance(_RESUME_BODY)
 RESUME_WINDOW_JS = _on_window(_RESUME_BODY)
 
+# Place the 600x150 world from the left-top so T-Rex (x≈0) stays in the tab.
+# Intern arcade defaults to transform-origin:center and auto side-margins.
+_PLACE_ARCADE = """
+  const el = (r && r.containerEl) || document.querySelector('.runner-container');
+  const wrap = document.querySelector('.interstitial-wrapper');
+  if (wrap) {
+    wrap.style.padding = '0';
+    wrap.style.margin = '0';
+    wrap.style.overflow = 'visible';
+  }
+  if (document.body) document.body.style.overflow = 'visible';
+  if (el) {
+    el.style.webkitAnimation = '';
+    el.style.animation = '';
+    el.style.width = '600px';
+    el.style.height = '150px';
+    el.style.margin = '0';
+    const padL = 48, padT = 24, padR = 48, padB = 24;
+    const scale = Math.max(1, Math.min(
+      (window.innerWidth - padL - padR) / 600,
+      (window.innerHeight - padT - padB) / 150
+    ));
+    el.style.transformOrigin = 'left top';
+    el.style.transform = 'translate(' + padL + 'px,' + padT + 'px) scale(' + scale + ')';
+  }
+  if (r) {
+    r.setArcadeModeContainerScale = function() {
+      const node = r.containerEl || document.querySelector('.runner-container');
+      if (!node) return;
+      node.style.margin = '0';
+      const padL = 48, padT = 24, padR = 48, padB = 24;
+      const scale = Math.max(1, Math.min(
+        (window.innerWidth - padL - padR) / 600,
+        (window.innerHeight - padT - padB) / 150
+      ));
+      node.style.transformOrigin = 'left top';
+      node.style.transform = 'translate(' + padL + 'px,' + padT + 'px) scale(' + scale + ')';
+    };
+  }
+"""
+
 _START_BODY = """
   if (!r || !r.tRex || r.crashed) return {ok: false};
   // Automation windows often lose focus; blur pauses the runner.
@@ -190,6 +229,11 @@ _START_BODY = """
   if (typeof r.startGame === "function") {
     try { r.startGame(); } catch (e) {}
   }
+  if (r.dimensions) {
+    r.dimensions.WIDTH = 600;
+    r.dimensions.HEIGHT = 150;
+  }
+""" + _PLACE_ARCADE + """
   r.activated = true;
   r.playingIntro = false;
   if (r.tRex) r.tRex.playingIntro = false;
@@ -233,6 +277,62 @@ _DUCK_OFF_BODY = """
 DUCK_OFF_JS = _on_instance(_DUCK_OFF_BODY)
 DUCK_OFF_WINDOW_JS = _on_window(_DUCK_OFF_BODY)
 
+_HOLD_BODY = """
+  if (!r) return;
+  r.paused = true;
+  if (typeof r.setPlayStatus === "function") r.setPlayStatus(false);
+  else r.playing = false;
+  r.updatePending = false;
+"""
+
+HOLD_JS = _on_instance(_HOLD_BODY)
+HOLD_WINDOW_JS = _on_window(_HOLD_BODY)
+
+# chrome://dino is arcade-mode. Intro CSS leaves the runner at T-Rex width (44px);
+# then arcade scales that sliver. Force the real 600x150 world, then place it.
+LAYOUT_RESET_JS = """
+function() {
+  const r = this;
+  if (r && r.dimensions) {
+    r.dimensions.WIDTH = 600;
+    r.dimensions.HEIGHT = 150;
+  }
+""" + _PLACE_ARCADE + """
+  const canvas = (r && r.canvas) || document.querySelector('canvas');
+  const runner = (r && r.containerEl) || document.querySelector('.runner-container');
+  const rs = runner ? getComputedStyle(runner) : null;
+  return {
+    dim: r && r.dimensions,
+    canvas: canvas && {attrW: canvas.width, attrH: canvas.height, cssW: canvas.clientWidth, cssH: canvas.clientHeight},
+    runner: runner && {w: runner.clientWidth, h: runner.clientHeight, transform: rs && rs.transform},
+    arcade: !!(document.body && document.body.classList.contains('arcade-mode')),
+    inner: {w: window.innerWidth, h: window.innerHeight},
+  };
+}
+"""
+
+LAYOUT_RESET_WINDOW_JS = """
+(() => {
+  const r = (typeof window !== 'undefined' && window.Runner && (window.Runner.instance_
+    || (typeof window.Runner.getInstance === 'function' && window.Runner.getInstance()))) || null;
+  if (r && r.dimensions) {
+    r.dimensions.WIDTH = 600;
+    r.dimensions.HEIGHT = 150;
+  }
+""" + _PLACE_ARCADE + """
+  const canvas = document.querySelector('canvas');
+  const runner = document.querySelector('.runner-container');
+  const rs = runner ? getComputedStyle(runner) : null;
+  return {
+    dim: r && r.dimensions,
+    canvas: canvas && {attrW: canvas.width, attrH: canvas.height, cssW: canvas.clientWidth, cssH: canvas.clientHeight},
+    runner: runner && {w: runner.clientWidth, h: runner.clientHeight, transform: rs && rs.transform},
+    arcade: !!(document.body && document.body.classList.contains('arcade-mode')),
+    inner: {w: window.innerWidth, h: window.innerHeight},
+  };
+})()
+"""
+
 
 class DinoGame(Protocol):
     def snapshot(self) -> dict[str, Any]: ...
@@ -240,6 +340,7 @@ class DinoGame(Protocol):
     def tap_jump(self) -> None: ...
     def set_duck(self, on: bool) -> None: ...
     def resume(self) -> None: ...
+    def hold(self) -> None: ...
     def close(self) -> None: ...
 
 
@@ -299,6 +400,9 @@ class FakeDinoGame:
         self.ducking = on
 
     def resume(self) -> None:
+        return
+
+    def hold(self) -> None:
         return
 
     def close(self) -> None:
@@ -441,6 +545,7 @@ class ChromeDinoGame:
         except RunnerError:
             pass
         self._await_run_started()
+        self._reset_layout()
 
     def _browser_call(self, method: str, **params: Any) -> dict[str, Any]:
         prev = self.cdp.session_id
@@ -761,6 +866,19 @@ class ChromeDinoGame:
         except RunnerError:
             pass
         self._with_runner(RESUME_JS, RESUME_WINDOW_JS)
+
+    def _reset_layout(self) -> None:
+        layout = self._with_runner(LAYOUT_RESET_JS, LAYOUT_RESET_WINDOW_JS)
+        print(f"dino layout={layout!r}", file=sys.stderr)
+
+    def hold(self) -> None:
+        deadline = time.time() + 2.5
+        while time.time() < deadline:
+            snap = self.snapshot()
+            if snap.get("crashed") or not snap.get("jumping"):
+                break
+            time.sleep(0.05)
+        self._with_runner(HOLD_JS, HOLD_WINDOW_JS)
 
     def close(self) -> None:
         self.set_duck(False)

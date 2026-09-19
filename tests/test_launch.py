@@ -151,7 +151,11 @@ def test_open_dino_chrome_loopback_isolated_profile(isolated, monkeypatch):
     assert "--remote-debugging-address=127.0.0.1" in cmd
     assert "--remote-debugging-port=0" in cmd
     assert "0.0.0.0" not in " ".join(cmd)
-    assert any(part.startswith("--app=chrome://dino") for part in cmd)
+    assert "chrome://dino/" in cmd
+    assert "--new-window" in cmd
+    assert not any(part.startswith("--app=") for part in cmd)
+    assert "--force-device-scale-factor=1" not in cmd
+    assert not any(part.startswith("--window-size=") for part in cmd)
     assert "about:blank" not in cmd
     blob = " ".join(cmd)
     assert "dino-launch-profile" in blob

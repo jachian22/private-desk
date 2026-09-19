@@ -22,7 +22,7 @@ from private_desk.runners import RunnerError, artifact_dir_for, artifacts_payloa
 
 # Intern scoreboard units (distanceRan * 0.025), not raw distanceRan.
 CLEAR_DISTANCE = 80.0
-TICK_S = 0.25
+TICK_S = 0.12
 
 
 def _cancelled(job: dict[str, Any]) -> bool:
@@ -125,9 +125,9 @@ def run_dino(job: dict[str, Any], kind: Kind, cfg: Config, params: dict[str, Any
     finally:
         if game is not None:
             try:
-                game.resume()
+                game.hold()
             except RunnerError:
                 pass
             game.close()
-        # Leave the throwaway Chrome up so the run stays on screen.
+        # Leave the throwaway Chrome frozen on the ground, last frame.
         # The next demo_dino start still kills this profile before launching.
