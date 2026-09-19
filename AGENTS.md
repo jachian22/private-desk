@@ -81,13 +81,17 @@ They might say:
 - open the repo → demo_open_repo (hosted: screenshots go to H Company; laptop may be taken over)
 - star the repo → demo_star_repo (same hosted note; ask if they are at the laptop first)
 
-If it is not one of those, run kinds and match title/id. Do not start a bank or canary kind unless they already added one and asked.
+If it is not one of those, run: private-desk decide --utterance "<their words>"
+If decide says ask_first or blocked_by, talk. Do not start.
+If legal and next=start, start that kind with a new idempotency key.
+Never start from a cron/routine, even if decide says start.
+decide never starts a job. Do not pass --apply (there is none).
 
 start KIND --idempotency-key KIND-YYYY-MM-DD-<unique>
 A new ask needs a new key. replayed: true means it already ran.
 Do not pass --wait. After start, get until the job is succeeded, failed, cancelled, or needs_you.
 
-needs_you: paste user_action.instruction and stop. When they say they finished on the laptop, resume then get.
+needs_you: paste user_action.instruction and stop. When they say they finished on the laptop, resume then get. Do not call decide for resume.
 succeeded: kind and artifact_dir. Do not read the files.
 desktop_busy: a job is already running.
 ```

@@ -6,7 +6,7 @@ import shutil
 import subprocess
 from typing import Any
 
-from private_desk.config import load_config
+from private_desk.config import load_config, typesafe_status
 from private_desk.local_model import boot_notes, probe_local_model
 
 PROTOCOL = "private-desk/v0"
@@ -161,6 +161,7 @@ def run_doctor(*, strict: bool = False) -> dict[str, Any]:
         "cli_on_path": cli_on_path,
         "dummy_kinds": "ok" if dummy_ok else "fail",
         "holo_kinds": "ok" if holo_ok else "blocked",
+        "typesafe": typesafe_status(cfg),
     }
     notes = [
         "demo_dummy_files does not need Holo. Missing holo is not a doctor failure.",
@@ -168,6 +169,7 @@ def run_doctor(*, strict: bool = False) -> dict[str, Any]:
         "Bank and session-canary kinds require local llama.cpp at holo_base_url.",
         "Holo never types passwords. Account kinds use browser + browser_profile from config (private-desk setup).",
         "demo_star_repo needs allow_mutating = true in config.toml.",
+        "decide (Jev-gated asks) needs typesafe_api_key or TYPESAFE_API_KEY. Dummy and mapped start still work without it.",
         screen_recording_note(parent),
     ]
     if holo["holo"] == "missing":

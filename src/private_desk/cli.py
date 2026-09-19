@@ -112,6 +112,21 @@ def main(argv: list[str] | None = None) -> int:
         help="Exit 5 if Holo or OS permissions are not ready.",
     )
 
+    p_decide = sub.add_parser("decide", help="Label a gate. Never starts a job.")
+    p_decide.add_argument("--utterance", required=True)
+    p_decide.add_argument("--job-id", dest="job_id")
+    p_decide.add_argument(
+        "--dump-state",
+        action="store_true",
+        help="Print the Jev state and questions. No API call.",
+    )
+    p_decide.add_argument(
+        "--policy",
+        choices=("jev", "scripted"),
+        default="jev",
+        help="jev calls TypeSafe. scripted matches known public demos with no key.",
+    )
+
     p_setup = sub.add_parser(
         "setup",
         help="Write local config: browser app name, profile, repo URL.",
@@ -161,6 +176,13 @@ def main(argv: list[str] | None = None) -> int:
         exit_code = int(payload.pop("exit_code", 0))
         _print_json(payload, force_json=force_json)
         return exit_code
+    elif args.cmd == "decide":
+        result = api.decide(
+            args.utterance,
+            job_id=args.job_id,
+            dump_state=args.dump_state,
+            policy=args.policy,
+        )
     elif args.cmd == "setup":
         browser = args.browser
         profile = args.browser_profile

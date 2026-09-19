@@ -88,6 +88,7 @@ private-desk get <job_id>
 private-desk status
 private-desk cancel <job_id>
 private-desk resume <job_id>
+private-desk decide --utterance "open the repo" --policy scripted
 private-desk doctor              # missing Holo is a warning
 private-desk doctor --strict
 ```
