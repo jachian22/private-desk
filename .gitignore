@@ -29,6 +29,9 @@ config.toml
 kinds/private/
 kinds/*.local.yaml
 
+# Local workstream briefs (Jev notes, Chase, etc.)
+plans/
+
 # Local job / model / Holo dumps if someone runs from the repo
 jobs/
 inbox/

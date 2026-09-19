@@ -1,0 +1,56 @@
+id: demo_post_x
+title: Post a canned tweet
+description: >
+  Optional mutating encore. Posts one prepared sentence from the daily browser.
+  Hosted Holo; screenshots of the everyday X window go to H Company.
+risk: mutating
+inference: hosted
+may_need_you: true
+runner: holo
+requires_artifacts: false
+max_steps: 25
+max_time_s: 180
+url_allowlist:
+  - https://x.com/
+  - https://twitter.com/
+denied_actions:
+  - transfer
+  - pay
+  - send_money
+  - follow
+  - dm
+  - delete
+  - settings
+  - like-storm
+params:
+  type: object
+  additionalProperties: false
+  required: [message]
+  properties:
+    message:
+      type: string
+      enum:
+        - "testing.. this tweet was brought to you by Jev on a private desktop"
+confirm_token: posted
+launch_url: "https://x.com/compose/post"
+launch_isolated: false
+artifacts:
+  dir_template: "{artifact_root}/{date}/{kind}"
+prompt: |
+  {browser} was just opened to the X compose page. Use that everyday window.
+  Do not switch profiles. Do not use Guest, Incognito, Spotlight, Launchpad,
+  Terminal, Cursor, Cmd+Tab, or Mission Control.
+  Do not type passwords, OTPs, or any text except this exact prepared message:
+  {message}
+  If a login wall, 2FA, captcha, or passkey prompt appears, do not type secrets.
+  Reply with exactly one of:
+  NEEDS_YOU: needs_login
+  NEEDS_YOU: mfa_required
+  NEEDS_YOU: os_permission
+  Then wait.
+  If already signed in, paste or type only that prepared message. Click Post once.
+  Do not follow, DM, like, delete, open settings, or invent a different tweet.
+  If you are not sure it posted, do not click Post again. Do not reply DONE.
+  When the tweet is clearly posted, reply with a single line:
+  DONE: posted
+  Then exit.

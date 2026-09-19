@@ -90,6 +90,13 @@ def test_scripted_star_asks_first_when_mutating_allowed(isolated):
     assert result.payload["invocation"] is None
 
 
+def test_scripted_tweet_needs_canned_param(isolated):
+    result = decide("get the word out", policy="scripted")
+    assert result.payload["decision"]["kind"] == "demo_post_x"
+    assert result.payload["decision"]["blocked_by"] == "required_params"
+    assert result.payload["invocation"] is None
+
+
 def test_scripted_unknown(isolated):
     result = decide("make me a sandwich", policy="scripted")
     assert result.payload["decision"]["blocked_by"] == "none"

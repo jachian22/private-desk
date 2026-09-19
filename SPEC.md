@@ -137,6 +137,7 @@ Agent-guided (AGENTS.md + `private-desk doctor`). Each step works if the next is
 | 1 | `demo_dummy_files` | No | n/a | CLI, worker, Job, artifacts on disk |
 | 2 | `demo_open_repo` | Yes | **hosted** (labeled) | Watch the desktop move; public URL |
 | 3 | `demo_star_repo` (optional) | Yes | hosted (labeled) | Mutating encore; needs GitHub session |
+| 3b | `demo_post_x` (optional) | Yes | hosted (labeled) | Canned tweet in the daily browser; `allow_mutating`; ask first |
 | 4 | Session canary (template; bank instance is **private**) | Yes | **local** | Open the real site; human logs in if needed; confirm session; stop |
 | 5 | Chase (private kind, not shipped) | Yes | **local** | Real job, only after 4 is green |
 
@@ -152,7 +153,7 @@ Kinds are YAML on disk. The assistant cannot create kinds. Shipping a new public
 
 **Public repo**
 
-- `demo_dummy_files`, `demo_open_repo`, `demo_star_repo`
+- `demo_dummy_files`, `demo_open_repo`, `demo_star_repo`, `demo_post_x`
 - Session-canary **template** (shape only: open URL → pause if login wall → confirm logged-in chrome → exit)
 - README: how to add a private kind; local Holo required for anything with a real account
 
@@ -195,7 +196,7 @@ prompt: |
   Do not log in. Do not star. Do not type passwords.
 ```
 
-Bank / session-canary kinds: `inference: local`, `may_need_you: true`. v0 runners refuse `mutating` unless local config `allow_mutating = true`. Grok Bot still asks the user first. `demo_star_repo` is mutating.
+Bank / session-canary kinds: `inference: local`, `may_need_you: true`. v0 runners refuse `mutating` unless local config `allow_mutating = true`. Grok Bot still asks the user first. `demo_star_repo` and `demo_post_x` are mutating. `demo_post_x` takes one canned `message` enum; Jev does not write the tweet.
 
 The runner interpolates **only** validated params plus `artifact_dir`, `date`, `repo_url`, `browser`, `browser_profile`. Optional `launch_url` uses the same mapping; v0 opens it with macOS `open` / AppleScript before Holo. `launch_isolated: true` (public open-repo demo) starts a throwaway Chromium profile so the window lands on the current Space. Account kinds must leave this off. Missing required param → `kind_denied` before Holo.
 
@@ -444,6 +445,7 @@ private-desk/
     demo_dummy_files.yaml
     demo_open_repo.yaml
     demo_star_repo.yaml
+    demo_post_x.yaml
     _session_canary.template.yaml
   tests/
 ```
@@ -460,7 +462,7 @@ v1 ship bar: CLI + worker + public demo kinds + doctor + AGENTS.md. Chase is a p
 - llama.cpp started by our worker
 - 1Password / cookie export
 - Opt-in `aggregates` (balances) gated by kind + user flag; default off
-- Mutating kinds beyond optional star
+- Mutating kinds beyond optional star and the canned X demo
 - Native Holo “background mode” if it changes the one-job lock
 
 ---
