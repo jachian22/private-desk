@@ -130,7 +130,7 @@ Inbound “POST to a Grok Bot routine URL + sender key” is **not** a v1 depend
 
 ## 6. Onboarding ladder
 
-Agent-guided (AGENTS.md + `private-desk doctor`). Each step works if the next is not set up yet.
+Agent-guided ([STARTER.md](STARTER.md) + [AGENTS.md](AGENTS.md) + `private-desk doctor`). Each step works if the next is not set up yet. `doctor` JSON includes `onboarding.next` / `ready` / `blocked` so an agent can stop without guessing. Missing Holo is still a warning, not a fail.
 
 | Step | Kind | Holo? | Inference | Point |
 | --- | --- | --- | --- | --- |
@@ -352,7 +352,7 @@ Error:
 }
 ```
 
-`doctor` must not print secrets. Report hosted vs local, whether llama.cpp is reachable, Holo binary, whether `browser` is set, whether `private-desk` is on PATH, and the **detected spawn parent** for Screen Recording (`hai-agent-runtime` plus Terminal/Cursor/iTerm/…). Missing Holo is a **warning** (dummy kinds still work); exit 0. `private-desk doctor --strict` exits 5 if Holo/permissions are not ready. Do not grep `holo doctor` English for permissions. `webhook: not used in v1`.
+`doctor` must not print secrets. Report hosted vs local, whether llama.cpp is reachable, Holo binary, whether `browser` is set, whether `private-desk` is on PATH, the **detected spawn parent** for Screen Recording (`hai-agent-runtime` plus Terminal/Cursor/iTerm/…), and an `onboarding` object (`next`, `ready`, `blocked`) for the first-time ladder. Missing Holo is a **warning** (dummy kinds still work); exit 0. `private-desk doctor --strict` exits 5 if Holo/permissions are not ready. Do not grep `holo doctor` English for permissions. `webhook: not used in v1`.
 
 `private-desk setup` writes gitignored `config.toml`. Agents ask the human which browser app to use, then pass `--browser` (non-interactive). TTY with no flags walks the same three fields.
 

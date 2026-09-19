@@ -1,6 +1,10 @@
 # AGENTS.md
 
-This file is for **coding agents** (Cursor, Codex, a forker’s agent). Humans: [README.md](README.md). Product law: [SPEC.md](SPEC.md).
+This file is for **coding agents** (Cursor, Codex, a forker’s agent).
+
+- **First-time Mac:** [STARTER.md](STARTER.md) (paste-in onboarder + known friction).
+- **Humans:** [README.md](README.md). Product law: [SPEC.md](SPEC.md).
+- **A** — you are changing this repo. **B** — they already cloned; walk the ladder. **Skill** — runtime kicks on an installed CLI.
 
 There is no screenshot, click, type, or `holo run` tool for Grok Bot. The assistant kicks `private-desk` on the **user’s Mac**. Holo stays behind the worker.
 
@@ -72,7 +76,7 @@ Cron/routines: **message**, do not start Holo. Start only after they say they ar
 
 ## Grok Bot skill (copy into the Bot)
 
-Humans talk in plain language. The Bot runs the CLI on the **local computer**.
+Humans talk in plain language. The Bot runs the CLI on the **local computer**. Forkers: generate this from [STARTER.md](STARTER.md) after `which private-desk` — the `CLI:` line below is this author’s Mac.
 
 ```
 You kick private-desk on this Mac (local computer only). The human never pastes the CLI.

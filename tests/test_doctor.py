@@ -19,6 +19,9 @@ def test_doctor_missing_holo_is_not_failure(isolated, monkeypatch):
     assert payload["ok"] is True
     assert payload["checks"]["dummy_kinds"] == "ok"
     assert payload["checks"]["holo"] == "missing"
+    assert payload["onboarding"]["first_job"] == "demo_dummy_files"
+    assert payload["onboarding"]["next"] == "setup"
+    assert "demo_dummy_files" in payload["onboarding"]["ready"]
 
 
 def test_doctor_strict_fails_without_holo(isolated, monkeypatch):
@@ -104,3 +107,47 @@ def test_doctor_names_screen_recording_parent(isolated, monkeypatch):
 
 def test_default_repo_url_is_this_repo():
     assert Config().repo_url == "https://github.com/jachian22/private-desk"
+
+
+def test_onboarding_dummy_when_holo_missing_but_browser_set(isolated, monkeypatch):
+    from private_desk.config import load_config, save_config
+
+    monkeypatch.setattr("private_desk.doctor._which", lambda _name: None)
+    cfg = load_config()
+    cfg.browser = "Google Chrome"
+    save_config(cfg)
+    payload = run_doctor(strict=False)
+    assert payload["onboarding"]["next"] == "demo_dummy_files"
+    assert any(item["kind"] == "demo_open_repo" for item in payload["onboarding"]["blocked"])
+    assert any(item["kind"] == "demo_dino" and item["need"] == "jev" for item in payload["onboarding"]["blocked"])
+
+
+def test_onboarding_blocks_dino_on_safari(isolated, monkeypatch):
+    from private_desk.config import load_config, save_config
+
+    monkeypatch.setenv("AI_GATEWAY_API_KEY", "gw-test")
+    monkeypatch.setattr("private_desk.doctor._which", lambda _name: None)
+    cfg = load_config()
+    cfg.browser = "Safari"
+    save_config(cfg)
+    payload = run_doctor(strict=False)
+    blob = str(payload)
+    assert "gw-test" not in blob
+    assert any(item["kind"] == "demo_dino" and item["need"] == "chromium" for item in payload["onboarding"]["blocked"])
+
+
+def test_onboarding_open_repo_when_holo_ready(isolated, monkeypatch):
+    from private_desk.config import load_config, save_config
+
+    monkeypatch.setattr("private_desk.doctor._which", lambda _name: "/usr/local/bin/holo")
+    monkeypatch.setattr(
+        "private_desk.doctor.subprocess.run",
+        lambda *_a, **_k: SimpleNamespace(returncode=0, stdout="", stderr=""),
+    )
+    cfg = load_config()
+    cfg.browser = "Google Chrome"
+    save_config(cfg)
+    payload = run_doctor(strict=False)
+    assert payload["onboarding"]["next"] == "demo_open_repo"
+    assert "demo_open_repo" in payload["onboarding"]["ready"]
+    assert any(item["kind"] == "demo_star_repo" and item["need"] == "allow_mutating" for item in payload["onboarding"]["blocked"])

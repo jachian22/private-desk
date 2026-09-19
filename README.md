@@ -2,7 +2,9 @@
 
 Privacy-preserving desktop jobs for a consumer assistant (Grok Bot first), powered by [HoloDesktop](https://github.com/hcompai/holo-desktop-cli). The assistant **kicks** a job on your laptop and never sees the screen.
 
-Law: [SPEC.md](SPEC.md). Agents: [AGENTS.md](AGENTS.md). License: [Apache-2.0](LICENSE).
+**New Mac?** Paste [STARTER.md](STARTER.md) into Cursor, Codex, or your repo agent. It clones, installs, walks the demo ladder, and stops at each missing layer. Known PATH / permissions / Bot friction is in that file.
+
+Law: [SPEC.md](SPEC.md). Agents (builders vs already-installed kick): [AGENTS.md](AGENTS.md). License: [Apache-2.0](LICENSE).
 
 ## Install
 
