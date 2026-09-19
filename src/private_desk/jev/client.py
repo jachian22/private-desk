@@ -59,6 +59,7 @@ _SCRIPTED: tuple[tuple[tuple[str, ...], str], ...] = (
         ("post to x", "post on x", "tweet", "post on twitter", "get the word out"),
         "demo_post_x",
     ),
+    (("chrome dino", "dino game", "dinosaur", "chrome://dino"), "demo_dino"),
 )
 
 
@@ -149,7 +150,7 @@ class TypeSafeJevClient:
             raise JevUnavailable("TypeSafe API key is not configured.")
         self.api_key = api_key
 
-    def ask(self, state: dict[str, Any], questions: dict[str, Any]) -> Answers:
+    def ask_response(self, state: dict[str, Any], questions: dict[str, Any]) -> Any:
         try:
             from typesafe_sdk import Choice, Noul, TypeSafeClient
         except ImportError as exc:
@@ -168,12 +169,14 @@ class TypeSafeJevClient:
                 os.environ["TYPESAFE_API_KEY"] = self.api_key
                 client_cm = TypeSafeClient()
             with client_cm as client:
-                response = client.system_one(state=state, questions=built)
+                return client.system_one(state=state, questions=built)
         except JevUnavailable:
             raise
         except Exception as exc:
             raise JevUnavailable("TypeSafe request failed.") from exc
 
+    def ask(self, state: dict[str, Any], questions: dict[str, Any]) -> Answers:
+        response = self.ask_response(state, questions)
         return Answers(
             kind=_choice_of(response, "kind") or NONE_KIND,
             next=_choice_of(response, "next") or "doctor",

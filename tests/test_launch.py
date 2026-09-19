@@ -1,8 +1,9 @@
 import subprocess
+from pathlib import Path
 
 import pytest
 
-from private_desk.launch import open_https
+from private_desk.launch import open_dino_chrome, open_https
 from private_desk.runners import RunnerError
 
 
@@ -97,8 +98,17 @@ def test_open_https_isolated_reuse_skips_when_job_chrome_already_open(tmp_path, 
 
 def test_close_job_browser_only_isolated(monkeypatch):
     killed: list[int] = []
-    monkeypatch.setattr("private_desk.launch.isolated_browser_pids", lambda profile=None: [4242, 4243])
-    monkeypatch.setattr("private_desk.launch.os.kill", lambda pid, sig: killed.append(pid))
+    remaining = {4242, 4243}
+
+    def fake_pids(profile=None):
+        return list(remaining)
+
+    def fake_kill(pid, sig):
+        killed.append(pid)
+        remaining.discard(pid)
+
+    monkeypatch.setattr("private_desk.launch.isolated_browser_pids", fake_pids)
+    monkeypatch.setattr("private_desk.launch.os.kill", fake_kill)
     from private_desk.launch import close_job_browser
 
     close_job_browser(isolated=False)
@@ -115,4 +125,40 @@ def test_open_https_skips_empty_and_rejects_non_http(monkeypatch):
     open_https("Safari", "", settle_s=0)
     with pytest.raises(RunnerError) as exc:
         open_https("Safari", "file:///etc/passwd", settle_s=0)
+    assert exc.value.code == "kind_denied"
+    with pytest.raises(RunnerError) as exc:
+        open_https("Google Chrome", "chrome://dino", settle_s=0)
+    assert exc.value.code == "kind_denied"
+
+
+def test_open_dino_chrome_loopback_isolated_profile(isolated, monkeypatch):
+    seen: list[list[str]] = []
+    binary = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+
+    def fake_popen(cmd, **kwargs):
+        seen.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0)
+
+    monkeypatch.setattr("private_desk.launch.close_dino_browser", lambda: None)
+    monkeypatch.setattr(
+        "private_desk.launch.chromium_macos_binary",
+        lambda _app: Path(binary),
+    )
+    monkeypatch.setattr("private_desk.launch.subprocess.Popen", fake_popen)
+    open_dino_chrome("Google Chrome", settle_s=0)
+    cmd = seen[0]
+    assert cmd[0] == binary
+    assert "--remote-debugging-address=127.0.0.1" in cmd
+    assert "--remote-debugging-port=0" in cmd
+    assert "0.0.0.0" not in " ".join(cmd)
+    assert "chrome://dino" not in cmd
+    assert "about:blank" in cmd
+    blob = " ".join(cmd)
+    assert "dino-launch-profile" in blob
+    assert "holo-launch-profile" not in blob
+
+
+def test_open_dino_chrome_rejects_safari(isolated):
+    with pytest.raises(RunnerError) as exc:
+        open_dino_chrome("Safari", settle_s=0)
     assert exc.value.code == "kind_denied"

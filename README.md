@@ -12,6 +12,8 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 # optional: Jev/decide live calls
 # pip install -e ".[jev]"
+# optional: chrome://dino demo (TypeSafe + loopback CDP; not Holo)
+# pip install -e ".[dino]"
 ```
 
 Put `.venv/bin` on PATH in **both** `~/.zprofile` and `~/.zshrc` so login shells and Grok’s local computer can run `private-desk` without `cd` or `PYTHONPATH=src`:
@@ -32,7 +34,7 @@ If `private-desk` is not found, stop and fix PATH. Do not set `PYTHONPATH=src`.
 
 ### Starter prompt (paste into Grok Bot)
 
-Copy the skill in [AGENTS.md](AGENTS.md) into the Bot description. Chat in plain language (`star the repo`, `open the repo`, `dummy files`). Known demos `start` directly. Anything else: `private-desk decide --utterance "…"`. The Bot runs the CLI on the **local computer**. If `doctor` is missing the CLI, keep the clone `.venv/bin` path in the skill.
+Copy the skill in [AGENTS.md](AGENTS.md) into the Bot description. Chat in plain language (`star the repo`, `open the repo`, `dummy files`, `chrome dino`). Known demos `start` directly. Anything else: `private-desk decide --utterance "…"`. The Bot runs the CLI on the **local computer**. If `doctor` is missing the CLI, keep the clone `.venv/bin` path in the skill.
 
 Optional config: `~/.config/private-desk/config.toml` (never commit this). `setup` writes the same file.
 
@@ -79,8 +81,9 @@ Add a private bank kind the same way: YAML only under `~/.config/private-desk/ki
 3. `private-desk start demo_open_repo` — hosted Holo, public GitHub page (screens go to H Company)
 4. `private-desk start demo_star_repo` — optional; needs `allow_mutating = true` and a GitHub login
 5. `private-desk start demo_post_x --param message="testing.. this tweet was brought to you by Jev on a private desktop"` — optional; daily browser; ask first; `allow_mutating`; do not invent a different tweet
-6. Private session canary — copy the template to config kinds (GitHub first); local llama.cpp; you log in on the laptop
-7. Private bank kind — local Holo only
+6. `private-desk start demo_dino` — optional; **not Holo**; Jev jumps/ducks from Runner numbers; Chromium + TypeSafe; ask first; takes the keyboard. On Sequoia, System Settings → Privacy & Security → App Management for Terminal (launch/quit throwaway Chrome), not Full Disk Access.
+7. Private session canary — copy the template to config kinds (GitHub first); local llama.cpp; you log in on the laptop
+8. Private bank kind — local Holo only
 
 Grok Bot cron must **ask** before starting any `may_need_you` job. It must not run Holo on the cloud computer.
 

@@ -90,6 +90,15 @@ def test_scripted_star_asks_first_when_mutating_allowed(isolated):
     assert result.payload["invocation"] is None
 
 
+def test_scripted_dino_asks_first(isolated):
+    result = decide("play chrome://dino", policy="scripted")
+    assert result.ok
+    assert result.payload["decision"]["kind"] == "demo_dino"
+    assert result.payload["decision"]["blocked_by"] == "ask_first"
+    assert result.payload["decision"]["ask_first"] is True
+    assert result.payload["invocation"] is None
+
+
 def test_scripted_tweet_needs_canned_param(isolated):
     result = decide("get the word out", policy="scripted")
     assert result.payload["decision"]["kind"] == "demo_post_x"
