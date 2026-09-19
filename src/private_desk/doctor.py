@@ -165,10 +165,10 @@ def run_doctor(*, strict: bool = False) -> dict[str, Any]:
     }
     notes = [
         "demo_dummy_files does not need Holo. Missing holo is not a doctor failure.",
-        "Public demos demo_open_repo and demo_star_repo use hosted Holo (screens go to H Company).",
+        "Public demos demo_open_repo, demo_star_repo, and demo_post_x use hosted Holo (screens go to H Company).",
         "Bank and session-canary kinds require local llama.cpp at holo_base_url.",
         "Holo never types passwords. Account kinds use browser + browser_profile from config (private-desk setup).",
-        "demo_star_repo needs allow_mutating = true in config.toml.",
+        "demo_star_repo and demo_post_x need allow_mutating = true in config.toml.",
         "decide (Jev-gated asks) needs typesafe_api_key or TYPESAFE_API_KEY. Dummy and mapped start still work without it.",
         screen_recording_note(parent),
     ]

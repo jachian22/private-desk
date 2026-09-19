@@ -55,6 +55,10 @@ _SCRIPTED: tuple[tuple[tuple[str, ...], str], ...] = (
     (("dummy files", "write dummy", "dummy"), "demo_dummy_files"),
     (("open the repo", "open repo", "open the github"), "demo_open_repo"),
     (("star the repo", "star repo"), "demo_star_repo"),
+    (
+        ("post to x", "post on x", "tweet", "post on twitter", "get the word out"),
+        "demo_post_x",
+    ),
 )
 
 
