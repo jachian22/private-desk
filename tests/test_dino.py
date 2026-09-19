@@ -2,7 +2,7 @@ import json
 import time
 
 from private_desk.api import get_job, list_kinds, start_job
-from private_desk.dino_cdp import FakeDinoGame, START_JS, loopback_ws_url, wait_for_devtools_ws
+from private_desk.dino_cdp import FakeDinoGame, START_JS, is_dino_url, loopback_ws_url, prefer_page_targets, wait_for_devtools_ws
 from private_desk.dino_session import CLEAR_DISTANCE
 from private_desk.jev.client import VercelGatewayJevClient
 from private_desk.jev.dino import jev_dino_buttons, mix_dino, public_dino_state, scripted_dino_buttons
@@ -135,6 +135,29 @@ def test_wait_for_devtools_ws_reads_file(tmp_path, monkeypatch):
     assert wait_for_devtools_ws(tmp_path, timeout_s=1.0) == "ws://127.0.0.1:9333/devtools/browser/abc"
 
 
+def test_is_dino_url():
+    assert is_dino_url("chrome://dino/")
+    assert is_dino_url("chrome-error://chromewebdata/")
+    assert not is_dino_url("about:blank")
+    assert not is_dino_url("https://github.com/")
+
+
+def test_prefer_page_targets_new_tab_over_startup_blank():
+    pages = [
+        {"targetId": "blank", "url": "about:blank", "type": "page"},
+        {"targetId": "dino", "url": "chrome://dino/", "type": "page"},
+    ]
+    ordered = prefer_page_targets(pages)
+    assert [p["targetId"] for p in ordered] == ["dino", "blank"]
+    blanks = prefer_page_targets(
+        [
+            {"targetId": "first", "url": "about:blank"},
+            {"targetId": "second", "url": "about:blank"},
+        ]
+    )
+    assert [p["targetId"] for p in blanks] == ["second", "first"]
+
+
 def test_loopback_ws_url_forces_ipv4():
     assert loopback_ws_url("ws://localhost:9222/devtools/page/1") == "ws://127.0.0.1:9222/devtools/page/1"
     assert loopback_ws_url("ws://[::1]:9222/devtools/page/1") == "ws://127.0.0.1:9222/devtools/page/1"
@@ -187,3 +210,136 @@ def test_start_js_skips_intro_and_blur_pause():
     assert "startGame" in START_JS
     assert "onVisibilityChange" in START_JS
     assert "playingIntro" in START_JS
+    assert "startJump" not in START_JS
+
+
+def test_jev_asked_when_cactus_is_on_screen():
+    from types import SimpleNamespace
+
+    from private_desk.jev.dino import live_dino_buttons
+
+    class Capture:
+        def __init__(self) -> None:
+            self.called = False
+
+        def ask_response(self, state, questions):
+            self.called = True
+            assert state.get("nearest_x") == 180
+            return SimpleNamespace(
+                nouls={
+                    "jump": SimpleNamespace(noul=0.8),
+                    "duck": SimpleNamespace(noul=0.1),
+                }
+            )
+
+    client = Capture()
+    buttons = live_dino_buttons(
+        client,
+        {"grounded": True, "speed": 6, "nearest_x": 180, "nearest_type": "CACTUS_SMALL"},
+    )
+    assert client.called is True
+    assert buttons.jump is True
+
+
+def test_jev_skipped_when_cactus_is_far():
+    from private_desk.jev.dino import live_dino_buttons
+
+    class Boom:
+        def ask_response(self, state, questions):
+            raise AssertionError("Jev should not run while the cactus is far")
+
+    buttons = live_dino_buttons(
+        Boom(),
+        {"grounded": True, "speed": 6, "nearest_x": 400, "nearest_type": "CACTUS_SMALL"},
+    )
+    assert buttons.jump is False
+
+
+def test_jev_skipped_while_airborne():
+    from private_desk.jev.dino import live_dino_buttons
+
+    class Boom:
+        def ask_response(self, state, questions):
+            raise AssertionError("Jev should not run while jumping")
+
+    buttons = live_dino_buttons(
+        Boom(),
+        {
+            "grounded": False,
+            "jumping": True,
+            "speed": 6,
+            "nearest_x": 160,
+            "nearest_type": "CACTUS_SMALL",
+        },
+    )
+    assert buttons.jump is False
+
+
+def test_jev_idle_when_horizon_empty():
+    from private_desk.jev.dino import live_dino_buttons
+
+    class Boom:
+        def ask_response(self, state, questions):
+            raise AssertionError("Jev should not run on an empty horizon")
+
+    buttons = live_dino_buttons(Boom(), {"grounded": True, "speed": 6})
+    assert buttons.jump is False
+
+
+def test_public_dino_state_playing_when_run_started():
+    public = public_dino_state(
+        {"playing": False, "distance": 12, "grounded": True, "speed": 6}
+    )
+    assert public["playing"] is True
+
+
+def test_dino_gateway_flake_jumps_when_cactus_is_close():
+    from private_desk.jev.client import JevUnavailable
+    from private_desk.jev.dino import live_dino_buttons
+
+    class Limited:
+        def ask_response(self, state, questions):
+            raise JevUnavailable("Vercel AI Gateway request failed (HTTP 429).")
+
+    buttons = live_dino_buttons(
+        Limited(),
+        {"grounded": True, "speed": 6, "nearest_x": 40, "nearest_type": "CACTUS_SMALL"},
+    )
+    assert buttons.jump is True
+
+
+def test_dino_gateway_flake_does_not_jump_when_far():
+    from private_desk.jev.client import JevUnavailable
+    from private_desk.jev.dino import live_dino_buttons
+
+    class Limited:
+        def ask_response(self, state, questions):
+            raise JevUnavailable("Vercel AI Gateway request failed (HTTP 429).")
+
+    buttons = live_dino_buttons(
+        Limited(),
+        {"grounded": True, "speed": 6, "nearest_x": 400, "nearest_type": "CACTUS_SMALL"},
+    )
+    assert buttons.jump is False
+
+
+def test_snapshot_uses_intern_scoreboard_units():
+    from private_desk.dino_cdp import SNAPSHOT_JS
+
+    assert "getActualDistance" in SNAPSHOT_JS
+    assert "0.025" in SNAPSHOT_JS
+
+
+def test_handler_object_ids_reads_cdp_listeners():
+    from private_desk.dino_cdp import handler_object_ids
+
+    ids = handler_object_ids(
+        {
+            "listeners": [
+                {"type": "keydown", "handler": {"objectId": "runner-1", "className": "Runner"}},
+                {"type": "keydown", "handler": {"type": "function"}},
+                {"type": "load"},
+            ]
+        }
+    )
+    assert ids == ["runner-1"]

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import time
 from typing import Any
@@ -10,18 +11,18 @@ from private_desk import jobs
 from private_desk.config import Config
 from private_desk.dino_cdp import ChromeDinoGame, DinoGame, FakeDinoGame, wait_for_devtools_ws
 from private_desk.jev.client import JevUnavailable, live_jev_client
-from private_desk.jev.dino import jev_dino_buttons, scripted_dino_buttons
+from private_desk.jev.dino import live_dino_buttons, scripted_dino_buttons
 from private_desk.kinds import Kind
 from private_desk.launch import (
-    close_dino_browser,
     dino_profile_dir,
     is_chromium_app,
     open_dino_chrome,
 )
 from private_desk.runners import RunnerError, artifact_dir_for, artifacts_payload
 
+# Intern scoreboard units (distanceRan * 0.025), not raw distanceRan.
 CLEAR_DISTANCE = 80.0
-TICK_S = 0.08
+TICK_S = 0.25
 
 
 def _cancelled(job: dict[str, Any]) -> bool:
@@ -81,7 +82,8 @@ def _play(job: dict[str, Any], kind: Kind, game: DinoGame, decide) -> dict[str, 
             ducking = False
         game.resume()
         time.sleep(TICK_S)
-        dist = float(snap.get("distance") or 0)
+        last = game.snapshot()
+        dist = float(last.get("distance") or 0)
         if dist >= CLEAR_DISTANCE:
             return {"distance": dist, "jumps": jumps, "cleared": True, "crashed": False}
     dist = float(last.get("distance") or 0)
@@ -95,9 +97,9 @@ def run_dino(job: dict[str, Any], kind: Kind, cfg: Config, params: dict[str, Any
     artifact_dir = artifact_dir_for(kind, cfg, params)
     if fake:
         game: DinoGame = FakeDinoGame()
-        _play(job, kind, game, scripted_dino_buttons)
+        result = _play(job, kind, game, scripted_dino_buttons)
         game.close()
-        (artifact_dir / "run.json").write_text("{}\n")
+        (artifact_dir / "run.json").write_text(json.dumps(result) + "\n")
         return artifacts_payload(artifact_dir, ["run.json"])
 
     browser = (cfg.browser or "").strip()
@@ -115,12 +117,17 @@ def run_dino(job: dict[str, Any], kind: Kind, cfg: Config, params: dict[str, Any
         open_dino_chrome(browser)
         ws = wait_for_devtools_ws(dino_profile_dir())
         game = ChromeDinoGame(ws)
-        _play(job, kind, game, lambda snap: jev_dino_buttons(client, snap))
-        (artifact_dir / "run.json").write_text("{}\n")
+        result = _play(job, kind, game, lambda snap: live_dino_buttons(client, snap))
+        (artifact_dir / "run.json").write_text(json.dumps(result) + "\n")
         return artifacts_payload(artifact_dir, ["run.json"])
     except JevUnavailable as exc:
         raise RunnerError("jev_unavailable", exc.message) from exc
     finally:
         if game is not None:
+            try:
+                game.resume()
+            except RunnerError:
+                pass
             game.close()
-        close_dino_browser()
+        # Leave the throwaway Chrome up so the run stays on screen.
+        # The next demo_dino start still kills this profile before launching.

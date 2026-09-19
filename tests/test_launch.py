@@ -151,8 +151,8 @@ def test_open_dino_chrome_loopback_isolated_profile(isolated, monkeypatch):
     assert "--remote-debugging-address=127.0.0.1" in cmd
     assert "--remote-debugging-port=0" in cmd
     assert "0.0.0.0" not in " ".join(cmd)
-    assert "chrome://dino" not in cmd
-    assert "about:blank" in cmd
+    assert any(part.startswith("--app=chrome://dino") for part in cmd)
+    assert "about:blank" not in cmd
     blob = " ".join(cmd)
     assert "dino-launch-profile" in blob
     assert "holo-launch-profile" not in blob

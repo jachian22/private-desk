@@ -268,9 +268,8 @@ def open_dino_chrome(app: str, *, settle_s: float = SETTLE_S) -> None:
     stale = profile / "DevToolsActivePort"
     if stale.is_file():
         stale.unlink(missing_ok=True)
-    # about:blank only. Putting chrome://dino on the argv (or using `open`)
-    # sends the URL to the already-running daily Chrome.
-    # port=0: Chrome picks a loopback port and writes DevToolsActivePort.
+    # --app avoids the NTP tab. Positional chrome://dino plus a default
+    # new-tab is what opened the extra tab. `open` would still hit daily Chrome.
     cmd = [
         str(chromium_macos_binary(name)),
         f"--user-data-dir={profile.resolve()}",
@@ -279,7 +278,7 @@ def open_dino_chrome(app: str, *, settle_s: float = SETTLE_S) -> None:
         "--remote-debugging-address=127.0.0.1",
         "--remote-debugging-port=0",
         "--remote-allow-origins=*",
-        "about:blank",
+        "--app=chrome://dino/",
     ]
     err_path = profile / "cdp.stderr.log"
     try:
