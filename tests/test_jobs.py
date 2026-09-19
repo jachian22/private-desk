@@ -99,6 +99,16 @@ def test_mutating_star_denied_by_default(isolated):
     assert result.payload["error"]["code"] == "kind_denied"
 
 
+def test_mutating_tweet_denied_by_default(isolated):
+    result = start_job(
+        "demo_post_x",
+        {"message": "testing.. this tweet was brought to you by Jev on a private desktop"},
+        None,
+    )
+    assert result.ok is False
+    assert result.payload["error"]["code"] == "kind_denied"
+
+
 def test_holo_kind_without_runtime_is_unavailable(isolated, monkeypatch):
     monkeypatch.setattr("private_desk.api.holo_ready", lambda _bin: False)
     result = start_job("demo_open_repo", {}, None)

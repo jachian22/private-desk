@@ -15,6 +15,7 @@ dependencies = ["pyyaml>=6.0"]
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
 jev = ["typesafe-sdk"]
+dino = ["websocket-client"]
 
 [tool.setuptools]
 script-files = ["scripts/private-desk"]

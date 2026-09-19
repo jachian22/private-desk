@@ -1,4 +1,4 @@
-"""Utterance secret scan. Runs before any TypeSafe call. Not param-key SECRET_KEY_RE."""
+"""Utterance secret scan. Runs before any Jev call. Not param-key SECRET_KEY_RE."""
 
 from __future__ import annotations
 

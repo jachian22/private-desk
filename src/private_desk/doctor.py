@@ -6,7 +6,8 @@ import shutil
 import subprocess
 from typing import Any
 
-from private_desk.config import load_config, typesafe_status
+from private_desk.config import Config, load_config, typesafe_status
+from private_desk.launch import is_chromium_app
 from private_desk.local_model import boot_notes, probe_local_model
 
 PROTOCOL = "private-desk/v0"
@@ -99,6 +100,59 @@ def spawn_parent_app(start_pid: int | None = None) -> str | None:
     return None
 
 
+def onboarding_hint(cfg: Config, checks: dict[str, Any]) -> dict[str, Any]:
+    """Next ladder gate for a first-time agent. Dummy is always listed ready."""
+    ready = ["demo_dummy_files"]
+    blocked: list[dict[str, str]] = []
+    browser = (cfg.browser or "").strip()
+    holo_ok = checks.get("holo") == "ok"
+    perms_ok = checks.get("permissions") == "ok"
+    jev = str(checks.get("typesafe") or "missing")
+    mutating = bool(checks.get("allow_mutating"))
+    local_ok = checks.get("local_model") == "reachable"
+
+    if not browser:
+        nxt = "setup"
+        need = 'private-desk setup --browser "Google Chrome"  # menu-bar name'
+    elif not holo_ok:
+        nxt = "demo_dummy_files"
+        need = "Holo missing: dummy only until HoloDesktop is installed"
+    elif not perms_ok:
+        nxt = "demo_dummy_files"
+        need = "Holo present but permissions not_ready; dummy still ok"
+    else:
+        nxt = "demo_open_repo"
+        need = "hosted Holo; screens go to H Company; ask if they are at the laptop"
+
+    if holo_ok and perms_ok:
+        ready.append("demo_open_repo")
+        if mutating:
+            ready.extend(["demo_star_repo", "demo_post_x"])
+        else:
+            blocked.append({"kind": "demo_star_repo", "need": "allow_mutating"})
+            blocked.append({"kind": "demo_post_x", "need": "allow_mutating"})
+    else:
+        blocked.append({"kind": "demo_open_repo", "need": "holo" if not holo_ok else "permissions"})
+
+    if jev == "missing":
+        blocked.append({"kind": "demo_dino", "need": "jev"})
+    elif browser and not is_chromium_app(browser):
+        blocked.append({"kind": "demo_dino", "need": "chromium"})
+    else:
+        ready.append("demo_dino")
+
+    if not local_ok:
+        blocked.append({"kind": "session_canary", "need": "local_model"})
+
+    return {
+        "first_job": "demo_dummy_files",
+        "next": nxt,
+        "need": need,
+        "ready": ready,
+        "blocked": blocked,
+    }
+
+
 def screen_recording_note(parent: str | None) -> str:
     if parent:
         return (
@@ -163,13 +217,16 @@ def run_doctor(*, strict: bool = False) -> dict[str, Any]:
         "holo_kinds": "ok" if holo_ok else "blocked",
         "typesafe": typesafe_status(cfg),
     }
+    onboarding = onboarding_hint(cfg, checks)
     notes = [
         "demo_dummy_files does not need Holo. Missing holo is not a doctor failure.",
-        "Public demos demo_open_repo and demo_star_repo use hosted Holo (screens go to H Company).",
+        "Public demos demo_open_repo, demo_star_repo, and demo_post_x use hosted Holo (screens go to H Company).",
+        "demo_dino is not Holo: Jev sees Runner numbers, code taps keys over loopback CDP. Needs Chromium + Jev (Vercel AI Gateway or TypeSafe).",
+        "demo_dino on macOS Sequoia: App Management for the app that ran private-desk (Terminal, Cursor, …) so it can launch and quit the throwaway Chrome. Not Full Disk Access.",
         "Bank and session-canary kinds require local llama.cpp at holo_base_url.",
         "Holo never types passwords. Account kinds use browser + browser_profile from config (private-desk setup).",
-        "demo_star_repo needs allow_mutating = true in config.toml.",
-        "decide (Jev-gated asks) needs typesafe_api_key or TYPESAFE_API_KEY. Dummy and mapped start still work without it.",
+        "demo_star_repo and demo_post_x need allow_mutating = true in config.toml.",
+        "decide (Jev-gated asks) and demo_dino need Jev: AI_GATEWAY_API_KEY, `npx vercel ai-gateway setup` (macOS Keychain), or TYPESAFE_API_KEY. Dummy and mapped start still work without it.",
         screen_recording_note(parent),
     ]
     if holo["holo"] == "missing":
@@ -182,7 +239,7 @@ def run_doctor(*, strict: bool = False) -> dict[str, Any]:
     if cli_on_path != "ok":
         notes.append(
             "private-desk is not on PATH. Put the repo .venv/bin on PATH in ~/.zprofile and ~/.zshrc. "
-            "A Bot that cannot find the command should stop, not set PYTHONPATH=src."
+            "A Bot that cannot find the command should stop, not set PYTHONPATH=src. See STARTER.md."
         )
     if local != "reachable":
         notes.extend(boot_notes(cfg.holo_base_url))
@@ -195,6 +252,7 @@ def run_doctor(*, strict: bool = False) -> dict[str, Any]:
         "protocol": PROTOCOL,
         "ok": ok,
         "checks": checks,
+        "onboarding": onboarding,
         "notes": notes,
         "exit_code": exit_code,
     }
