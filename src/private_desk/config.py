@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import tomllib
 from dataclasses import dataclass, fields
 from typing import Any
@@ -19,6 +20,7 @@ class Config:
     browser: str = ""
     browser_profile: str = "private-desk"
     allow_mutating: bool = False
+    typesafe_api_key: str = ""
 
 
 def load_config() -> Config:
@@ -31,6 +33,19 @@ def load_config() -> Config:
         if key in data:
             setattr(cfg, key, data[key])
     return cfg
+
+
+def typesafe_api_key(cfg: Config | None = None) -> str:
+    """Env wins. Never log the return value."""
+    env = os.environ.get("TYPESAFE_API_KEY", "").strip()
+    if env:
+        return env
+    cfg = cfg if cfg is not None else load_config()
+    return str(cfg.typesafe_api_key or "").strip()
+
+
+def typesafe_status(cfg: Config | None = None) -> str:
+    return "configured" if typesafe_api_key(cfg) else "missing"
 
 
 def browser_for_prompt(cfg: Config) -> str:

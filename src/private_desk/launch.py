@@ -100,6 +100,10 @@ def _open_isolated_chromium(name: str, url: str, *, reuse: bool) -> None:
     """Job Chrome: separate user-data-dir so we can quit it without the daily browser."""
     profile = isolated_profile_dir()
     profile.mkdir(parents=True, exist_ok=True)
+    # After login the window is already on the repo. Passing the URL again
+    # opens a duplicate tab, then close_job_browser kills the whole profile.
+    if reuse and isolated_browser_pids(profile):
+        return
     cmd = [
         OPEN_BIN,
         "-na",

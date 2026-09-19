@@ -98,6 +98,7 @@ v2 (parked): HTTP MCP, Tailscale/relay, inbound webhooks. Do not bind `0.0.0.0` 
 
 **Skill / routine shape**
 
+- The human speaks in plain language (`star the repo`). The Bot maps that to a kind id; they should not have to paste the CLI.
 - Call `private-desk kinds` rather than guessing params
 - Call `private-desk start …` with an idempotency key (`kind` + params + local date + a unique suffix). Same key within 24h returns the existing Job with `replayed: true` — tell them it already ran. A new ask (“do it again”) needs a new key.
 - Tell the user the job id and that the laptop may be taken over
@@ -300,6 +301,7 @@ Stable `code` values (extend, don’t reuse):
 | `guardrail` | runner tried a denied action |
 | `bank_unavailable` | site down |
 | `internal` | last resort; no stack traces |
+| `jev_unavailable` | `decide` without a TypeSafe key, missing SDK, or API down. Formulaic `start` still works |
 
 `cancelled` is a state, not an error object.
 
@@ -319,7 +321,10 @@ private-desk status              # running + needs_you
 private-desk cancel <job_id>
 private-desk resume <job_id>     # human finished laptop action; waits until not needs_you
 private-desk doctor              # runtime, permissions, inference, webhook N/A in v1
+private-desk decide --utterance TEXT [--job-id ID] [--dump-state] [--policy jev|scripted]
 ```
+
+`decide` labels a gate (`start` / `get` / `doctor` / talk). It never forks a worker. Formulaic kinds may still `start` with no TypeSafe key. Jev-gated asks fail closed (`jev_unavailable`) if the key is missing or the API is down. Secret-shaped utterances are refused in code before any TypeSafe call. Jev sees utterance + public kind cards + Job JSON — never prompts or screens.
 
 `start` returns immediately with the Job (`running`). Do not block until Holo exits. Dummy-files may be so fast the first `get` is already `succeeded`. Optional `--wait` (and `private-desk wait <id>`) is laptop-tty only: the worker still forks; this process polls until the Job leaves `running` (`needs_you`, `succeeded`, `failed`, `cancelled`) and prints `get`. `resume` writes the continue signal and waits until the Job leaves `needs_you` (`running` or terminal). It does not wait for Holo to finish.
 

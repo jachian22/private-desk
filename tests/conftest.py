@@ -19,6 +19,7 @@ def desk_home(tmp_path, monkeypatch):
         str(Path(__file__).resolve().parents[1] / "kinds"),
     )
     monkeypatch.delenv("PRIVATE_DESK_FAKE_RUNNER", raising=False)
+    monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
     return home
 
 

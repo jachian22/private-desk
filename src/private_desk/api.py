@@ -222,6 +222,27 @@ def resume_job(job_id: str, *, poll_s: float = 0.2, timeout_s: float = 30.0) -> 
     return get_job(job_id)
 
 
+def decide(
+    utterance: str,
+    *,
+    job_id: str | None = None,
+    dump_state: bool = False,
+    policy: str = "jev",
+    client: Any | None = None,
+    answers: Any | None = None,
+) -> Result:
+    from private_desk.decide import decide as run_decide
+
+    return run_decide(
+        utterance,
+        job_id=job_id,
+        dump_state=dump_state,
+        policy=policy,
+        client=client,
+        answers=answers,
+    )
+
+
 def job_logs(job_id: str) -> Result:
     job = jobs.load_job(job_id)
     if not job:
