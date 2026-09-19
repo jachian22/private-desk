@@ -157,6 +157,68 @@ _SNAPSHOT_BODY = """
 SNAPSHOT_JS = _on_instance(_SNAPSHOT_BODY)
 SNAPSHOT_WINDOW_JS = _on_window(_SNAPSHOT_BODY)
 
+# Place the 600x150 world from the left-top so T-Rex (x≈0) stays in the tab.
+# Intern arcade: transform-origin top center, margin:auto, transition 400ms
+# (that delay is why layout logs identity, then T-Rex clips on the left).
+_PLACE_ARCADE = """
+  if (!document.getElementById('pd-dino-place')) {
+    const sheet = document.createElement('style');
+    sheet.id = 'pd-dino-place';
+    sheet.textContent = [
+      '.arcade-mode .runner-container {',
+      '  margin: 0 !important; left: 0 !important; right: auto !important;',
+      '  transform-origin: left top !important; transition: none !important;',
+      '  overflow: visible !important;',
+      '}',
+      '.arcade-mode .interstitial-wrapper {',
+      '  overflow: visible !important; padding: 0 !important; margin: 0 !important;',
+      '}',
+      '.arcade-mode, .arcade-mode .runner-canvas { overflow: visible !important; }',
+    ].join(' ');
+    document.documentElement.appendChild(sheet);
+  }
+  const el = (r && r.containerEl) || document.querySelector('.runner-container');
+  const wrap = document.querySelector('.interstitial-wrapper');
+  if (wrap) {
+    wrap.style.padding = '0';
+    wrap.style.margin = '0';
+    wrap.style.overflow = 'visible';
+  }
+  if (document.body) document.body.style.overflow = 'visible';
+  function pdPlace(node) {
+    if (!node) return;
+    node.style.webkitAnimation = '';
+    node.style.animation = '';
+    node.style.transition = 'none';
+    node.style.width = '600px';
+    node.style.height = '150px';
+    node.style.margin = '0';
+    node.style.left = '0';
+    node.style.right = 'auto';
+    const padL = 48, padT = 24, padR = 48, padB = 24;
+    const scale = Math.max(1, Math.min(
+      (window.innerWidth - padL - padR) / 600,
+      (window.innerHeight - padT - padB) / 150
+    ));
+    node.style.transformOrigin = 'left top';
+    node.style.transform = 'translate(' + padL + 'px,' + padT + 'px) scale(' + scale + ')';
+  }
+  pdPlace(el);
+  if (r) {
+    r.setArcadeModeContainerScale = function() {
+      pdPlace(r.containerEl || document.querySelector('.runner-container'));
+    };
+    if (!r._pdArcadeHook && typeof r.adjustDimensions === 'function') {
+      const origAdj = r.adjustDimensions.bind(r);
+      r.adjustDimensions = function() {
+        origAdj();
+        pdPlace(r.containerEl || document.querySelector('.runner-container'));
+      };
+      r._pdArcadeHook = true;
+    }
+  }
+"""
+
 _RESUME_BODY = """
   if (!r || r.crashed) return;
   r.paused = false;
@@ -169,51 +231,11 @@ _RESUME_BODY = """
   r.updatePending = false;
   if (typeof r.scheduleNextUpdate === "function") r.scheduleNextUpdate();
   else if (typeof r.update === "function") r.update();
+""" + _PLACE_ARCADE + """
 """
 
 RESUME_JS = _on_instance(_RESUME_BODY)
 RESUME_WINDOW_JS = _on_window(_RESUME_BODY)
-
-# Place the 600x150 world from the left-top so T-Rex (x≈0) stays in the tab.
-# Intern arcade defaults to transform-origin:center and auto side-margins.
-_PLACE_ARCADE = """
-  const el = (r && r.containerEl) || document.querySelector('.runner-container');
-  const wrap = document.querySelector('.interstitial-wrapper');
-  if (wrap) {
-    wrap.style.padding = '0';
-    wrap.style.margin = '0';
-    wrap.style.overflow = 'visible';
-  }
-  if (document.body) document.body.style.overflow = 'visible';
-  if (el) {
-    el.style.webkitAnimation = '';
-    el.style.animation = '';
-    el.style.width = '600px';
-    el.style.height = '150px';
-    el.style.margin = '0';
-    const padL = 48, padT = 24, padR = 48, padB = 24;
-    const scale = Math.max(1, Math.min(
-      (window.innerWidth - padL - padR) / 600,
-      (window.innerHeight - padT - padB) / 150
-    ));
-    el.style.transformOrigin = 'left top';
-    el.style.transform = 'translate(' + padL + 'px,' + padT + 'px) scale(' + scale + ')';
-  }
-  if (r) {
-    r.setArcadeModeContainerScale = function() {
-      const node = r.containerEl || document.querySelector('.runner-container');
-      if (!node) return;
-      node.style.margin = '0';
-      const padL = 48, padT = 24, padR = 48, padB = 24;
-      const scale = Math.max(1, Math.min(
-        (window.innerWidth - padL - padR) / 600,
-        (window.innerHeight - padT - padB) / 150
-      ));
-      node.style.transformOrigin = 'left top';
-      node.style.transform = 'translate(' + padL + 'px,' + padT + 'px) scale(' + scale + ')';
-    };
-  }
-"""
 
 _START_BODY = """
   if (!r || !r.tRex || r.crashed) return {ok: false};
@@ -301,10 +323,12 @@ function() {
   const canvas = (r && r.canvas) || document.querySelector('canvas');
   const runner = (r && r.containerEl) || document.querySelector('.runner-container');
   const rs = runner ? getComputedStyle(runner) : null;
+  const box = runner ? runner.getBoundingClientRect() : null;
   return {
     dim: r && r.dimensions,
     canvas: canvas && {attrW: canvas.width, attrH: canvas.height, cssW: canvas.clientWidth, cssH: canvas.clientHeight},
-    runner: runner && {w: runner.clientWidth, h: runner.clientHeight, transform: rs && rs.transform},
+    runner: runner && {w: runner.clientWidth, h: runner.clientHeight, transform: rs && rs.transform, origin: rs && rs.transformOrigin},
+    rect: box && {x: box.x, y: box.y, w: box.width, h: box.height, right: box.right},
     arcade: !!(document.body && document.body.classList.contains('arcade-mode')),
     inner: {w: window.innerWidth, h: window.innerHeight},
   };

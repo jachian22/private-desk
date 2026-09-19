@@ -265,6 +265,9 @@ def test_start_js_skips_intro_and_blur_pause():
     assert "playingIntro" in START_JS
     assert "startJump" not in START_JS
     assert 'width = "600px"' in START_JS or "600px" in START_JS
+    assert "pd-dino-place" in START_JS
+    from private_desk.dino_cdp import RESUME_JS
+    assert "pd-dino-place" in RESUME_JS
 
 
 def test_reflex_jumps_without_jev_when_cactus_is_imminent():
@@ -367,6 +370,8 @@ def test_layout_reset_keeps_trex_on_screen():
     assert "left top" in LAYOUT_RESET_JS
     assert "padL" in LAYOUT_RESET_JS
     assert "margin = '0'" in LAYOUT_RESET_JS
+    assert "pd-dino-place" in LAYOUT_RESET_JS
+    assert "transition: none" in LAYOUT_RESET_JS
     assert "querySelector('.runner-container')" in LAYOUT_RESET_JS
     assert "querySelector('.runner-container')" in LAYOUT_RESET_WINDOW_JS
 
