@@ -4,7 +4,7 @@ from types import SimpleNamespace
 from private_desk.api import decide
 from private_desk.cli import main
 from private_desk.config import load_config, typesafe_status
-from private_desk.jev.client import FakeJevClient, TypeSafeJevClient, JevUnavailable
+from private_desk.jev.client import FakeJevClient, TypeSafeJevClient, JevUnavailable, VercelGatewayJevClient, live_jev_client, GATEWAY_EVALUATE_URL
 from private_desk.jev.mixer import Answers
 from private_desk.jev.questions import build_questions
 
@@ -43,6 +43,60 @@ def test_env_key_wins(isolated, monkeypatch):
     monkeypatch.setattr("private_desk.doctor._which", lambda _name: None)
     blob = json.dumps(run_doctor(strict=False))
     assert "sk-from-env" not in blob
+
+
+def test_doctor_gateway_configured_no_leak(isolated, monkeypatch):
+    from private_desk.doctor import run_doctor
+    from private_desk.config import save_config, typesafe_status as status
+
+    monkeypatch.setattr("private_desk.doctor._which", lambda _name: None)
+    cfg = load_config()
+    cfg.ai_gateway_api_key = "gw-test-do-not-print"
+    save_config(cfg)
+    assert status() == "gateway"
+    payload = run_doctor(strict=False)
+    assert payload["checks"]["typesafe"] == "gateway"
+    blob = json.dumps(payload)
+    assert "gw-test-do-not-print" not in blob
+    assert "gw-test" not in blob
+
+
+def test_gateway_env_preferred_over_typesafe(isolated, monkeypatch):
+    monkeypatch.setenv("AI_GATEWAY_API_KEY", "gw-from-env")
+    monkeypatch.setenv("TYPESAFE_API_KEY", "sk-from-env")
+    assert typesafe_status() == "gateway"
+    client = live_jev_client()
+    assert isinstance(client, VercelGatewayJevClient)
+    from private_desk.doctor import run_doctor
+
+    monkeypatch.setattr("private_desk.doctor._which", lambda _name: None)
+    blob = json.dumps(run_doctor(strict=False))
+    assert "gw-from-env" not in blob
+    assert "sk-from-env" not in blob
+
+
+def test_keychain_gateway_when_env_and_config_empty(isolated, monkeypatch):
+    import subprocess
+
+    monkeypatch.delenv("PRIVATE_DESK_SKIP_KEYCHAIN", raising=False)
+
+    def fake_run(cmd, **kwargs):
+        assert cmd[:3] == ["security", "find-generic-password", "-s"]
+        assert "Vercel AI Gateway" in cmd
+        assert "-w" in cmd
+        return subprocess.CompletedProcess(cmd, 0, stdout="vck_from_keychain\n", stderr="")
+
+    monkeypatch.setattr("private_desk.config.subprocess.run", fake_run)
+    from private_desk.config import ai_gateway_api_key, typesafe_status
+
+    assert ai_gateway_api_key() == "vck_from_keychain"
+    assert typesafe_status() == "gateway"
+
+
+def test_keychain_gateway_not_used_in_tests(isolated):
+    from private_desk.config import ai_gateway_api_key
+
+    assert ai_gateway_api_key() == ""
 
 
 def test_dump_state_no_api_no_prompt(isolated):
@@ -87,6 +141,22 @@ def test_scripted_star_asks_first_when_mutating_allowed(isolated):
     result = decide("star the repo", policy="scripted")
     assert result.payload["decision"]["blocked_by"] == "ask_first"
     assert result.payload["decision"]["ask_first"] is True
+    assert result.payload["invocation"] is None
+
+
+def test_scripted_dino_asks_first(isolated):
+    result = decide("play chrome://dino", policy="scripted")
+    assert result.ok
+    assert result.payload["decision"]["kind"] == "demo_dino"
+    assert result.payload["decision"]["blocked_by"] == "ask_first"
+    assert result.payload["decision"]["ask_first"] is True
+    assert result.payload["invocation"] is None
+
+
+def test_scripted_tweet_needs_canned_param(isolated):
+    result = decide("get the word out", policy="scripted")
+    assert result.payload["decision"]["kind"] == "demo_post_x"
+    assert result.payload["decision"]["blocked_by"] == "required_params"
     assert result.payload["invocation"] is None
 
 
@@ -231,3 +301,127 @@ def test_typesafe_import_error(monkeypatch):
         assert "typesafe-sdk" in exc.message
     else:
         raise AssertionError("expected JevUnavailable")
+
+
+def test_gateway_adapter_maps_boolean_and_choice(isolated):
+    captured: dict = {}
+
+    def fake_post(url, headers, body, timeout):
+        captured["url"] = url
+        captured["headers"] = {k: v for k, v in headers.items() if k.lower() != "authorization"}
+        captured["auth"] = headers.get("Authorization", "")
+        captured["body"] = json.loads(body)
+        return {
+            "answers": {
+                "kind": {"type": "choice", "choice": "demo_open_repo", "probabilities": {"demo_open_repo": 1}},
+                "next": {"type": "choice", "choice": "start"},
+                "kick_now": {"type": "boolean", "probability": 0.91},
+                "ask_first": {"type": "boolean", "probability": 0.1},
+                "use_local_only": {"type": "boolean", "probability": 0.1},
+                "mutating_ok": {"type": "boolean", "probability": 0.1},
+                "secret_in_request": {"type": "boolean", "probability": 0.05},
+            }
+        }
+
+    client = VercelGatewayJevClient("gw-secret", post=fake_post)
+    from private_desk.config import Config
+    from private_desk.kinds import load_kinds
+    from private_desk.jev.questions import build_state
+
+    real = load_kinds()
+    state = build_state(utterance="open", kinds=real, cfg=Config(), job=None, desktop_busy=False)
+    questions = build_questions(kinds=real, include_job=False)
+    answers = client.ask(state, questions)
+    assert captured["url"] == GATEWAY_EVALUATE_URL
+    assert captured["headers"]["ai-model-id"] == "typesafe-ai/jev"
+    assert captured["headers"]["ai-evaluation-model-specification-version"] == "4"
+    assert captured["body"]["questions"]["kick_now"]["type"] == "boolean"
+    assert captured["body"]["questions"]["kind"]["type"] == "choice"
+    assert "providerOptions" not in captured["body"]
+    assert "gw-secret" not in json.dumps(captured["body"])
+    assert captured["auth"] == "Bearer gw-secret"
+    assert answers.kind == "demo_open_repo"
+    assert answers.next == "start"
+    assert answers.kick_now == 0.91
+
+
+def test_gateway_http_error_no_leak(monkeypatch):
+    import urllib.error
+
+    def boom(*_a, **_k):
+        raise urllib.error.HTTPError(
+            GATEWAY_EVALUATE_URL,
+            401,
+            "Unauthorized",
+            hdrs=None,
+            fp=None,
+        )
+
+    monkeypatch.setattr("private_desk.jev.client.urllib.request.urlopen", boom)
+    client = VercelGatewayJevClient("gw-secret")
+    try:
+        client.ask(
+            {"utterance": "x"},
+            {"kick_now": {"type": "noul", "instructions": "k"}},
+        )
+    except JevUnavailable as exc:
+        assert "401" in exc.message
+        assert "gw-secret" not in exc.message
+    else:
+        raise AssertionError("expected JevUnavailable")
+
+
+def test_gateway_403_asks_for_card(monkeypatch):
+    import io
+    import urllib.error
+
+    payload = json.dumps(
+        {"error": {"type": "customer_verification_required", "message": "add a card"}}
+    ).encode()
+
+    def boom(*_a, **_k):
+        raise urllib.error.HTTPError(
+            GATEWAY_EVALUATE_URL,
+            403,
+            "Forbidden",
+            hdrs=None,
+            fp=io.BytesIO(payload),
+        )
+
+    monkeypatch.setattr("private_desk.jev.client.urllib.request.urlopen", boom)
+    client = VercelGatewayJevClient("gw-secret")
+    try:
+        client.ask({"n": 1}, {"odd": {"type": "noul", "instructions": "odd?"}})
+    except JevUnavailable as exc:
+        assert "403" in exc.message
+        assert "credit card" in exc.message.lower()
+        assert "gw-secret" not in exc.message
+    else:
+        raise AssertionError("expected JevUnavailable")
+
+
+def test_decide_jev_uses_gateway(isolated, monkeypatch):
+    monkeypatch.setenv("AI_GATEWAY_API_KEY", "gw-secret")
+
+    def fake_post(url, headers, body, timeout):
+        payload = json.loads(body)
+        assert payload["questions"]["kind"]["type"] == "choice"
+        return {
+            "answers": {
+                "kind": {"type": "choice", "choice": "demo_open_repo"},
+                "next": {"type": "choice", "choice": "start"},
+                "kick_now": {"type": "boolean", "probability": 0.9},
+                "ask_first": {"type": "boolean", "probability": 0.1},
+                "use_local_only": {"type": "boolean", "probability": 0.1},
+                "mutating_ok": {"type": "boolean", "probability": 0.1},
+                "secret_in_request": {"type": "boolean", "probability": 0.05},
+            }
+        }
+
+    monkeypatch.setattr("private_desk.jev.client._post_gateway", fake_post)
+    result = decide("open the repo", policy="jev")
+    assert result.ok
+    assert result.payload["decision"]["kind"] == "demo_open_repo"
+    assert result.payload["jev"]["kick_now"] == 0.9
+    blob = json.dumps(result.payload)
+    assert "gw-secret" not in blob

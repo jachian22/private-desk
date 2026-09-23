@@ -6,11 +6,11 @@ from typing import Any
 
 from private_desk import jobs
 from private_desk.api import Result, _err, _ok
-from private_desk.config import Config, load_config, typesafe_api_key
+from private_desk.config import Config, load_config
 from private_desk.jev.client import (
     JevUnavailable,
     ScriptedJevClient,
-    TypeSafeJevClient,
+    live_jev_client,
 )
 from private_desk.jev.mixer import Answers, Decision, Facts, mix
 from private_desk.jev.questions import build_questions, build_state
@@ -98,14 +98,7 @@ def decide(
                 if policy == "scripted":
                     client = ScriptedJevClient(kinds)
                 elif policy == "jev":
-                    key = typesafe_api_key(cfg)
-                    if not key:
-                        return _err(
-                            "jev_unavailable",
-                            "TypeSafe API key is not configured. Formulaic start still works.",
-                            5,
-                        )
-                    client = TypeSafeJevClient(key)
+                    client = live_jev_client(cfg)
                 else:
                     return _err("kind_denied", f"Unknown decide policy '{policy}'.", 2)
             resolved = client.ask(state, questions)

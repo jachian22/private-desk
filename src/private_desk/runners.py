@@ -135,4 +135,8 @@ def run_holo(job: dict[str, Any], kind: Kind, cfg: Config, params: dict[str, Any
 def run_kind(job: dict[str, Any], kind: Kind, cfg: Config, params: dict[str, Any]) -> dict[str, Any]:
     if kind.runner == "dummy":
         return run_dummy(job, kind, cfg, params)
+    if kind.runner == "dino":
+        from private_desk.dino_session import run_dino
+
+        return run_dino(job, kind, cfg, params)
     return run_holo(job, kind, cfg, params)

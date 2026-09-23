@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import os
+import subprocess
+import sys
 import tomllib
 from dataclasses import dataclass, fields
 from typing import Any
 from pathlib import Path
 
 from private_desk import paths
+
+_GATEWAY_KEYCHAIN_SERVICE = "Vercel AI Gateway"
 
 
 @dataclass
@@ -21,6 +25,7 @@ class Config:
     browser_profile: str = "private-desk"
     allow_mutating: bool = False
     typesafe_api_key: str = ""
+    ai_gateway_api_key: str = ""
 
 
 def load_config() -> Config:
@@ -44,7 +49,53 @@ def typesafe_api_key(cfg: Config | None = None) -> str:
     return str(cfg.typesafe_api_key or "").strip()
 
 
+def _keychain_ai_gateway_api_key() -> str:
+    """macOS Keychain item written by `npx vercel ai-gateway setup`. Never log the return."""
+    if sys.platform != "darwin":
+        return ""
+    if os.environ.get("PRIVATE_DESK_SKIP_KEYCHAIN", "").strip():
+        return ""
+    accounts = ["vercel-ai-gateway"]
+    user = (os.environ.get("USER") or os.environ.get("LOGNAME") or "").strip()
+    if user and user not in accounts:
+        accounts.append(user)
+    accounts.append("")
+    for account in accounts:
+        cmd = ["security", "find-generic-password", "-s", _GATEWAY_KEYCHAIN_SERVICE]
+        if account:
+            cmd.extend(["-a", account])
+        cmd.append("-w")
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=5, check=False)
+        except (OSError, subprocess.TimeoutExpired):
+            continue
+        if proc.returncode != 0:
+            continue
+        key = (proc.stdout or "").strip()
+        if key:
+            return key
+    return ""
+
+
+def ai_gateway_api_key(cfg: Config | None = None) -> str:
+    """Env, then config.toml, then `vercel ai-gateway setup` Keychain. Never log the return."""
+    env = os.environ.get("AI_GATEWAY_API_KEY", "").strip()
+    if env:
+        return env
+    cfg = cfg if cfg is not None else load_config()
+    from_cfg = str(cfg.ai_gateway_api_key or "").strip()
+    if from_cfg:
+        return from_cfg
+    return _keychain_ai_gateway_api_key()
+
+
+def jev_configured(cfg: Config | None = None) -> bool:
+    return bool(ai_gateway_api_key(cfg) or typesafe_api_key(cfg))
+
+
 def typesafe_status(cfg: Config | None = None) -> str:
+    if ai_gateway_api_key(cfg):
+        return "gateway"
     return "configured" if typesafe_api_key(cfg) else "missing"
 
 

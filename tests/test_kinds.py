@@ -25,6 +25,34 @@ def test_star_repo_uses_job_chrome(isolated):
     assert kind.launch_isolated is True
 
 
+CANNED_TWEET = "testing.. this tweet was brought to you by Jev on a private desktop"
+
+
+def test_post_x_is_canned_daily_browser(isolated):
+    kind = load_kinds()["demo_post_x"]
+    assert kind.risk == "mutating"
+    assert kind.inference == "hosted"
+    assert kind.may_need_you is True
+    assert kind.launch_isolated is False
+    assert kind.launch_url == "https://x.com/compose/post"
+    assert kind.confirm_token == "posted"
+    assert "https://x.com/" in kind.url_allowlist
+    assert "follow" in kind.denied_actions
+    assert kind.params["required"] == ["message"]
+    assert kind.params["properties"]["message"]["enum"] == [CANNED_TWEET]
+    listed = list_kinds().payload["kinds"]
+    item = next(k for k in listed if k["id"] == "demo_post_x")
+    assert "prompt" not in item
+    assert item["params"]["properties"]["message"]["enum"] == [CANNED_TWEET]
+    denied = start_job("demo_post_x", {"message": CANNED_TWEET}, None)
+    assert denied.ok is False
+    assert denied.payload["error"]["code"] == "kind_denied"
+    missing = start_job("demo_post_x", {}, None)
+    assert missing.ok is False
+    invented = start_job("demo_post_x", {"message": "hello world"}, None)
+    assert invented.ok is False
+
+
 def test_start_rejects_password_param(isolated):
     result = start_job("demo_dummy_files", {"password": "x"}, None)
     assert result.ok is False

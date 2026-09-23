@@ -1,0 +1,28 @@
+id: demo_dino
+title: Play chrome://dino with Jev
+description: >
+  Jev jumps/ducks from Runner numbers (no screenshots). Code taps Space/Down.
+  Not Holo. Jev sees speed and obstacle geometry, not pixels.
+  Takes the keyboard in a throwaway Chromium profile.
+risk: read_only
+inference: hosted
+may_need_you: true
+runner: dino
+requires_artifacts: false
+max_steps: 500
+max_time_s: 180
+url_allowlist: []
+denied_actions:
+  - transfer
+  - pay
+  - send_money
+params:
+  type: object
+  additionalProperties: false
+  properties: {}
+launch_url: "chrome://dino"
+launch_isolated: true
+artifacts:
+  dir_template: "{artifact_root}/{date}/{kind}"
+prompt: |
+  No Holo. The dino runner reads chrome://dino Runner state and asks Jev.

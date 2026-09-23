@@ -20,6 +20,8 @@ def desk_home(tmp_path, monkeypatch):
     )
     monkeypatch.delenv("PRIVATE_DESK_FAKE_RUNNER", raising=False)
     monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
+    monkeypatch.delenv("AI_GATEWAY_API_KEY", raising=False)
+    monkeypatch.setenv("PRIVATE_DESK_SKIP_KEYCHAIN", "1")
     return home
 
 
